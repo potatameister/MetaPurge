@@ -126,11 +126,14 @@ class MetadataRepository(private val context: Context) {
         )
 
         val exifAttrs = listOf(
-            ExifInterface.TAG_EXPOSURE_TIME, ExifInterface.TAG_FNUMBER,
-            ExifInterface.TAG_ISO_SPEED, ExifInterface.TAG_DATETIME_ORIGINAL,
-            ExifInterface.TAG_DATETIME_DIGITIZED, ExifInterface.TAG_FLASH,
-            ExifInterface.TAG_FOCAL_LENGTH, ExifInterface.TAG_WHITE_BALANCE,
-            ExifInterface.TAG_EXPOSURE_MODE, ExifInterface.TAG_COLOR_SPACE
+            ExifInterface.TAG_EXPOSURE_TIME,
+            ExifInterface.TAG_DATETIME_ORIGINAL,
+            ExifInterface.TAG_DATETIME_DIGITIZED,
+            ExifInterface.TAG_FLASH,
+            ExifInterface.TAG_FOCAL_LENGTH,
+            ExifInterface.TAG_WHITE_BALANCE,
+            ExifInterface.TAG_EXPOSURE_MODE,
+            ExifInterface.TAG_COLOR_SPACE
         )
 
         val gpsAttrs = listOf(

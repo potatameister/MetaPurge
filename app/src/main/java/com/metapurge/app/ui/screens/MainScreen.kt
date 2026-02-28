@@ -40,18 +40,18 @@ import kotlinx.coroutines.delay
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    viewModel: MainViewModel = viewModel()
+    mainViewModel: MainViewModel = viewModel()
 ) {
-    val images by viewModel.images.collectAsState()
-    val stats by viewModel.stats.collectAsState()
-    val isProcessing by viewModel.isProcessing.collectAsState()
-    val toast by viewModel.toast.collectAsState()
+    val images by mainViewModel.images.collectAsState()
+    val stats by mainViewModel.stats.collectAsState()
+    val isProcessing by mainViewModel.isProcessing.collectAsState()
+    val toast by mainViewModel.toast.collectAsState()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
         if (uris.isNotEmpty()) {
-            viewModel.processUris(uris)
+            mainViewModel.processUris(uris)
         }
     }
 
@@ -232,8 +232,7 @@ private fun StatCard(
                 value,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                brush = Brush.linearGradient(listOf(Accent, AccentSecondary)),
-                color = TextPrimary
+                color = Accent
             )
             Text(
                 label,
@@ -263,7 +262,7 @@ private fun UploadZone(onClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .size(64.dp)
-                    .clip(RoundedCornerShape(50 percent 50))
+                    .clip(RoundedCornerShape(32.dp))
                     .background(BgTertiary),
                 contentAlignment = Alignment.Center
             ) {
