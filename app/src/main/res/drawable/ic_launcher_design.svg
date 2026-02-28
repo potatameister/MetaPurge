@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Blue shield background -->
+  <path d="M256 32 L460 100 L460 280 C460 380 350 460 256 490 C162 460 52 380 52 280 L52 100 Z" fill="#1e40af"/>
+  
+  <!-- Light blue inner circle -->
+  <circle cx="256" cy="220" r="110" fill="#60a5fa"/>
+  
+  <!-- White M letter -->
+  <path d="M160 180 L180 180 L220 280 L260 200 L300 280 L340 180 L360 180 L300 310 L256 250 L212 310 Z" fill="white"/>
+  
+  <!-- Small lock/key hole to represent privacy -->
+  <circle cx="256" cy="340" r="20" fill="#1e40af"/>
+  <path d="M256 340 L248 360 L264 360 Z" fill="#1e40af"/>
+</svg>
