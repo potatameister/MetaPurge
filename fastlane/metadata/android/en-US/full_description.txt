@@ -1,0 +1,18 @@
+MetaPurge is a privacy-focused Android app that removes hidden metadata (EXIF, GPS, device info) from your photos.
+
+Every time you take a picture, your phone stamps hidden data into the file: GPS Coordinates, Device Model, Date/Time, and Settings. If you upload this photo to social media or forums, you are doxxing yourself.
+
+MetaPurge scans your images for these threats and surgically removes them, leaving you with a clean, safe file that contains pixels and nothing else.
+
+Features:
+- Removes EXIF, TIFF, GPS, and IPTC metadata instantly
+- Warns you if GPS/Device ID tags are found
+- 100% Offline - works entirely on your device
+- Zero Quality Loss - modifies metadata without re-compressing the image
+- Dark mode cyberpunk UI
+
+Privacy Guarantee:
+- 100% offline - no internet needed
+- Nothing is uploaded anywhere
+- All processing happens on your device
+- Open source - verify the code yourself
