@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MetaPurge</string>
+    <string name="app_subtitle">Privacy Tool</string>
+    <string name="select_photos">Select Photos</string>
+    <string name="purge_all">Purge All</string>
+    <string name="clear">Clear</string>
+    <string name="download">Download</string>
+    <string name="processing">Processing...</string>
+    <string name="no_metadata">No metadata found</string>
+    <string name="metadata_found">Hidden metadata detected</string>
+    <string name="gps_found">GPS Location Found</string>
+    <string name="purged">Metadata purged!</string>
+    <string name="saved">Image saved!</string>
+    <string name="files_purged">Files Purged</string>
+    <string name="data_removed">Data Removed</string>
+    <string name="gps_found_count">GPS Found</string>
+    <string name="view_full_metadata">View Full Metadata</string>
+    <string name="device">Device</string>
+    <string name="date_taken">Date Taken</string>
+    <string name="software">Software</string>
+    <string name="image_info">Image Info</string>
+    <string name="exif_data">EXIF Data</string>
+    <string name="gps_data">GPS Data</string>
+    <string name="about_metapurge">About MetaPurge</string>
+    <string name="how_it_works">How it works &amp; why it matters</string>
+    <string name="what_is_metadata">What is Photo Metadata?</string>
+    <string name="metadata_description">Every photo contains hidden data called EXIF metadata. Your camera or phone embeds this automatically including your GPS location, device model, and when the photo was taken.</string>
+    <string name="why_care">Why should you care?</string>
+    <string name="privacy_guarantee">Privacy guarantee</string>
+    <string name="offline_notice">100% offline - no internet needed</string>
+    <string name="got_it">Got it!</string>
+    <string name="version">Version</string>
+    <string name="made_with_love">Made with love by potatameister</string>
+</resources>

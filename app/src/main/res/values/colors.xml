@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_primary">#0f172a</color>
+    <color name="bg_secondary">#1e293b</color>
+    <color name="bg_tertiary">#334155</color>
+    <color name="text_primary">#f8fafc</color>
+    <color name="text_secondary">#cbd5e1</color>
+    <color name="text_muted">#64748b</color>
+    <color name="border_color">#334155</color>
+    <color name="accent">#ef4444</color>
+    <color name="accent_secondary">#f97316</color>
+    <color name="success">#22c55e</color>
+    <color name="success_bg">#1a22c55e</color>
+    <color name="danger_bg">#26ef4444</color>
+    <color name="danger_border">#4cef4444</color>
+    <color name="white">#ffffff</color>
+    <color name="black">#000000</color>
+</resources>
