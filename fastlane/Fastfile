@@ -1,0 +1,40 @@
+default_platform(:android)
+
+platform :android do
+  desc "Build debug APK"
+  lane :debug do
+    gradle(
+      task: "assembleDebug"
+    )
+  end
+
+  desc "Build release APK"
+  lane :release do
+    gradle(
+      task: "assembleRelease"
+    )
+  end
+
+  desc "Run tests"
+  lane :test do
+    gradle(
+      task: "test"
+    )
+  end
+
+  desc "Run lint"
+  lane :lint do
+    gradle(
+      task: "lint"
+    )
+  end
+
+  desc "Build and upload to Firebase App Distribution"
+  lane :firebase do
+    gradle(task: "assembleRelease")
+    firebase_app_distribution(
+      app: "1:123456789:android:abcdef",
+      groups: "testers"
+    )
+  end
+end
