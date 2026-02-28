@@ -117,42 +117,24 @@ class MetadataRepository(private val context: Context) {
         val exifTags = mutableMapOf<String, String>()
         val gpsTags = mutableMapOf<String, String>()
 
-        val imageAttrs = listOf(
-            ExifInterface.TAG_MAKE, ExifInterface.TAG_MODEL,
-            ExifInterface.TAG_ORIENTATION, ExifInterface.TAG_XRESOLUTION,
-            ExifInterface.TAG_YRESOLUTION, ExifInterface.TAG_RESOLUTION_UNIT,
-            ExifInterface.TAG_SOFTWARE, ExifInterface.TAG_DATETIME,
-            ExifInterface.TAG_ARTIST, ExifInterface.TAG_COPYRIGHT
+        val knownTags = listOf(
+            "Make", "Model", "Orientation", "Software", "DateTime",
+            "Artist", "Copyright", "ExposureTime", "DateTimeOriginal",
+            "DateTimeDigitized", "Flash", "FocalLength", "WhiteBalance",
+            "ExposureMode", "ColorSpace", "GPSLatitude", "GPSLatitudeRef",
+            "GPSLongitude", "GPSLongitudeRef", "GPSAltitude", "GPSAltitudeRef",
+            "GPSTimeStamp", "GPSDateStamp"
         )
 
-        val exifAttrs = listOf(
-            ExifInterface.TAG_EXPOSURE_TIME,
-            ExifInterface.TAG_DATETIME_ORIGINAL,
-            ExifInterface.TAG_DATETIME_DIGITIZED,
-            ExifInterface.TAG_FLASH,
-            ExifInterface.TAG_FOCAL_LENGTH,
-            ExifInterface.TAG_WHITE_BALANCE,
-            ExifInterface.TAG_EXPOSURE_MODE,
-            ExifInterface.TAG_COLOR_SPACE
-        )
-
-        val gpsAttrs = listOf(
-            ExifInterface.TAG_GPS_LATITUDE, ExifInterface.TAG_GPS_LATITUDE_REF,
-            ExifInterface.TAG_GPS_LONGITUDE, ExifInterface.TAG_GPS_LONGITUDE_REF,
-            ExifInterface.TAG_GPS_ALTITUDE, ExifInterface.TAG_GPS_ALTITUDE_REF,
-            ExifInterface.TAG_GPS_TIMESTAMP, ExifInterface.TAG_GPS_DATESTAMP
-        )
-
-        imageAttrs.forEach { tag ->
-            exif.getAttribute(tag)?.let { imageTags[tag] = it }
-        }
-
-        exifAttrs.forEach { tag ->
-            exif.getAttribute(tag)?.let { exifTags[tag] = it }
-        }
-
-        gpsAttrs.forEach { tag ->
-            exif.getAttribute(tag)?.let { gpsTags[tag] = it }
+        knownTags.forEach { tag ->
+            exif.getAttribute(tag)?.let { value ->
+                when {
+                    tag.startsWith("GPS") -> gpsTags[tag] = value
+                    tag in listOf("ExposureTime", "DateTimeOriginal", "DateTimeDigitized", "Flash", 
+                                 "FocalLength", "WhiteBalance", "ExposureMode", "ColorSpace") -> exifTags[tag] = value
+                    else -> imageTags[tag] = value
+                }
+            }
         }
 
         return AllTags(imageTags, exifTags, gpsTags)

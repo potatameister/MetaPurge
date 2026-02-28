@@ -60,7 +60,7 @@ fun MainScreen(
     LaunchedEffect(toast) {
         if (toast != null) {
             delay(2000)
-            viewModel.dismissToast()
+            mainViewModel.dismissToast()
         }
     }
 
@@ -74,7 +74,7 @@ fun MainScreen(
 
             StatsRow(
                 filesPurged = stats.filesPurged,
-                dataRemoved = viewModel.formatBytes(stats.dataRemoved),
+                dataRemoved = mainViewModel.formatBytes(stats.dataRemoved),
                 gpsFound = stats.gpsFound
             )
 
@@ -90,8 +90,8 @@ fun MainScreen(
                 BatchActions(
                     count = images.count { !it.isPurged && it.metadata?.hasExif == true },
                     isProcessing = isProcessing,
-                    onPurgeAll = { viewModel.purgeAll() },
-                    onClear = { viewModel.clearAll() }
+                    onPurgeAll = { mainViewModel.purgeAll() },
+                    onClear = { mainViewModel.clearAll() }
                 )
             }
 
@@ -103,8 +103,8 @@ fun MainScreen(
                 items(images, key = { it.id }) { image ->
                     ImageCard(
                         image = image,
-                        onPurge = { viewModel.purgeImage(image.id) },
-                        formatBytes = viewModel::formatBytes
+                        onPurge = { mainViewModel.purgeImage(image.id) },
+                        formatBytes = mainViewModel::formatBytes
                     )
                 }
             }
