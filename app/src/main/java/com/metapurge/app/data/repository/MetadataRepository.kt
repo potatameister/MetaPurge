@@ -177,14 +177,13 @@ class MetadataRepository(private val context: Context) {
     }
 
     private fun purgeMetadataBytes(input: ByteArray): ByteArray {
-        val output = mutableListOf<Byte>()
-
         if (input.size < 2 || input[0].toInt() and 0xFF != 0xFF || input[1].toInt() and 0xFF != 0xD8) {
             return input
         }
 
-        output.add(0xFF.toByte())
-        output.add(0xD8.toByte())
+        val output = ByteArrayOutputStream(input.size)
+        output.write(0xFF)
+        output.write(0xD8)
 
         var i = 2
         while (i < input.size - 1) {
@@ -200,30 +199,25 @@ class MetadataRepository(private val context: Context) {
                 }
 
                 if (marker == 0xDA) {
-                    while (i < input.size) {
-                        output.add(input[i])
-                        i++
-                    }
+                    output.write(input, i, input.size - i)
                     break
                 }
 
                 if (marker == 0xD8) {
                     i += 2
                 } else if (marker == 0xD9) {
-                    output.add(0xFF.toByte())
-                    output.add(0xD9.toByte())
+                    output.write(0xFF)
+                    output.write(0xD9)
                     i += 2
                 } else {
                     if (i + 3 < input.size) {
                         val len = ((input[i + 2].toInt() and 0xFF) shl 8) or (input[i + 3].toInt() and 0xFF)
                         if (len > 0 && len < input.size - i - 2) {
-                            for (j in 0 until len + 2) {
-                                output.add(input[i + j])
-                            }
+                            output.write(input, i, len + 2)
                             i += len + 2
                         } else {
-                            output.add(input[i])
-                            output.add(input[i + 1])
+                            output.write(0xFF)
+                            output.write(input[i + 1].toInt() and 0xFF)
                             i += 2
                         }
                     } else {
@@ -231,16 +225,13 @@ class MetadataRepository(private val context: Context) {
                     }
                 }
             } else {
-                output.add(input[i])
+                output.write(input[i].toInt() and 0xFF)
                 i++
             }
         }
 
-        if (output.size < 10) {
-            return input
-        }
-
-        return output.toByteArray()
+        val result = output.toByteArray()
+        return if (result.size < 10) input else result
     }
 
     private suspend fun saveCleanImage(bytes: ByteArray, originalName: String): Uri? = withContext(Dispatchers.IO) {
@@ -253,7 +244,7 @@ class MetadataRepository(private val context: Context) {
                 put(MediaStore.Images.Media.DISPLAY_NAME, cleanName)
                 put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MetaPurge")
                     put(MediaStore.Images.Media.IS_PENDING, 1)
                 }
             }
