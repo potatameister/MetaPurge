@@ -90,11 +90,8 @@ fun MainScreen() {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Image(
-                            painter = coil.compose.rememberImagePainter(
-                                data = R.drawable.ic_launcher,
-                                builder = { crossfade(true) }
-                            ),
+                        AsyncImage(
+                            model = R.drawable.ic_launcher,
                             contentDescription = "MetaPurge Icon",
                             modifier = Modifier
                                 .size(44.dp)
@@ -119,7 +116,6 @@ fun MainScreen() {
                     containerColor = DarkNavy,
                     titleContentColor = White
                 ),
-                shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
                 actions = {
                     IconButton(onClick = { showInfoModal = true }) {
                         Icon(
