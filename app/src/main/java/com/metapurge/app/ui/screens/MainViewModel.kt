@@ -43,6 +43,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isProcessing.value = true
             val newImages = mutableListOf<ImageItem>()
+            val sessionId = System.currentTimeMillis()
 
             for (uri in uris) {
                 val context = getApplication<Application>()
@@ -65,7 +66,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     uri = uri.toString(),
                     name = name,
                     size = size,
-                    metadata = metadata
+                    metadata = metadata,
+                    sessionId = sessionId
                 )
                 newImages.add(item)
             }
@@ -73,6 +75,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _images.value = _images.value + newImages
             _isProcessing.value = false
         }
+    }
+
+    fun removeImage(imageId: String) {
+        _images.value = _images.value.filter { it.id != imageId }
     }
 
     fun purgeImage(imageId: String) {

@@ -12,18 +12,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.Brush
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -81,110 +75,183 @@ fun MainScreen() {
         }
     }
 
-    Scaffold(
-        containerColor = LightGray,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        AsyncImage(
-                            model = R.drawable.ic_launcher,
-                            contentDescription = "MetaPurge Icon",
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(12.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                        Text(
-                            "MetaPurge",
-                            fontWeight = FontWeight.Bold,
-                            color = White,
-                            fontSize = 22.sp
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkNavy,
-                    titleContentColor = White
-                ),
-                actions = {
-                    IconButton(onClick = { showInfoModal = true }) {
-                        Icon(
-                            Icons.Default.Info,
-                            contentDescription = "Info",
-                            tint = SlateGray
-                        )
-                    }
-                }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(White, Color(0xFFF1F5F9), LightGray)
+                )
             )
-        }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            item {
-                AnimatedContent(
-                    targetState = images.isNotEmpty(),
-                    transitionSpec = {
-                        fadeIn(animationSpec = tween(300)) togetherWith
-                                fadeOut(animationSpec = tween(300))
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            AsyncImage(
+                                model = R.drawable.ic_launcher,
+                                contentDescription = "MetaPurge Icon",
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            Text(
+                                "MetaPurge",
+                                fontWeight = FontWeight.Bold,
+                                color = White,
+                                fontSize = 22.sp
+                            )
+                        }
                     },
-                    label = "upload_zone"
-                ) { hasImages ->
-                    if (hasImages) {
-                        CompactUploadZone(
-                            count = images.size,
-                            onClick = { launcher.launch("image/jpeg") }
-                        )
-                    } else {
-                        UploadZone(onClick = { launcher.launch("image/jpeg") })
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = DarkNavy,
+                        titleContentColor = White
+                    ),
+                    actions = {
+                        IconButton(onClick = { showInfoModal = true }) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = "Info",
+                                tint = SlateGray
+                            )
+                        }
                     }
-                }
-            }
-
-            if (images.isNotEmpty()) {
-                item {
-                    BatchActions(
-                        count = images.count { !it.isPurged && it.metadata?.hasExif == true },
-                        isProcessing = isProcessing,
-                        onPurgeAll = { viewModel.purgeAll() },
-                        onClear = { viewModel.clearAll() }
-                    )
-                }
-            }
-
-            items(images, key = { it.id }) { image ->
-                ImageCard(
-                    image = image,
-                    onPurge = { viewModel.purgeImage(image.id) },
-                    formatBytes = viewModel::formatBytes
                 )
             }
+        ) { paddingValues ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                item {
+                    AnimatedContent(
+                        targetState = images.isNotEmpty(),
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(300)) togetherWith
+                                    fadeOut(animationSpec = tween(300))
+                        },
+                        label = "upload_zone"
+                    ) { hasImages ->
+                        if (hasImages) {
+                            CompactUploadZone(
+                                count = images.size,
+                                onClick = { launcher.launch("image/jpeg") }
+                            )
+                        } else {
+                            UploadZone(onClick = { launcher.launch("image/jpeg") })
+                        }
+                    }
+                }
 
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                SupportSection()
+                if (images.isNotEmpty()) {
+                    item {
+                        BatchActions(
+                            count = images.count { !it.isPurged && it.metadata?.hasExif == true },
+                            isProcessing = isProcessing,
+                            onPurgeAll = { viewModel.purgeAll() },
+                            onClear = { viewModel.clearAll() }
+                        )
+                    }
+                }
+
+                val groupedImages = images.groupBy { it.sessionId }
+                
+                groupedImages.forEach { (sessionId, sessionImages) ->
+                    item(key = "divider_$sessionId") {
+                        if (images.indexOf(sessionImages.first()) != 0) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                thickness = 1.dp,
+                                color = DarkNavy.copy(alpha = 0.1f)
+                            )
+                        }
+                    }
+
+                    items(sessionImages, key = { it.id }) { image ->
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = {
+                                if (it == SwipeToDismissBoxValue.EndToStart) {
+                                    viewModel.removeImage(image.id)
+                                    true
+                                } else false
+                            }
+                        )
+
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            enableDismissFromStartToEnd = false,
+                            backgroundContent = {
+                                val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                                    Color.Red.copy(alpha = 0.8f)
+                                } else Color.Transparent
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(color)
+                                        .padding(horizontal = 20.dp),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = White
+                                    )
+                                }
+                            },
+                            content = {
+                                ImageCard(
+                                    image = image,
+                                    onPurge = { viewModel.purgeImage(image.id) },
+                                    onRemove = { viewModel.removeImage(image.id) },
+                                    onShare = { shareImage(context, image) },
+                                    formatBytes = viewModel::formatBytes
+                                )
+                            }
+                        )
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    SupportSection()
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
             }
 
-            item {
-                Spacer(modifier = Modifier.height(80.dp))
+            if (showInfoModal) {
+                InfoModal(onDismiss = { showInfoModal = false })
             }
-        }
-
-        if (showInfoModal) {
-            InfoModal(onDismiss = { showInfoModal = false })
         }
     }
+}
+
+private fun shareImage(context: android.content.Context, image: ImageItem) {
+    val uriString = image.cleanedUri ?: image.uri
+    val uri = Uri.parse(uriString)
+    
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/jpeg"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share Cleaned Photo"))
 }
 
 @Composable
@@ -360,6 +427,8 @@ private fun BatchActions(
 private fun ImageCard(
     image: ImageItem,
     onPurge: () -> Unit,
+    onRemove: () -> Unit,
+    onShare: () -> Unit,
     formatBytes: (Long) -> String
 ) {
     val context = LocalContext.current
@@ -374,7 +443,8 @@ private fun ImageCard(
             .fillMaxWidth()
             .animateContentSize(),
         colors = CardDefaults.cardColors(containerColor = White),
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
             Box(
@@ -391,6 +461,23 @@ private fun ImageCard(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
+
+                // Individual Clear (X) Button
+                IconButton(
+                    onClick = onRemove,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(50))
+                        .size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Remove",
+                        tint = White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
 
                 if (image.isPurged) {
                     Box(
@@ -583,28 +670,33 @@ private fun ImageCard(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Button(
-                    onClick = onPurge,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !image.isPurged && image.metadata?.hasExif == true,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = DarkNavy,
-                        disabledContainerColor = SlateGray
-                    ),
-                    shape = RoundedCornerShape(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        if (image.isPurged) Icons.Default.Check else Icons.Default.CleaningServices,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = if (image.isPurged) SlateGray else White
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (image.isPurged) "Already Cleaned" else "Remove Metadata",
-                        color = if (image.isPurged) SlateGray else White,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Button(
+                        onClick = if (image.isPurged) onShare else onPurge,
+                        modifier = Modifier.weight(1f),
+                        enabled = (image.isPurged) || (!image.isPurged && image.metadata?.hasExif == true),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (image.isPurged) SkyBlueDark else DarkNavy,
+                            disabledContainerColor = SlateGray
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Icon(
+                            if (image.isPurged) Icons.Default.Share else Icons.Default.CleaningServices,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = White
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (image.isPurged) "Share Clean Photo" else "Remove Metadata",
+                            color = White,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         }

@@ -7,7 +7,8 @@ data class ImageItem(
     val size: Long,
     val metadata: ImageMetadata?,
     val isPurged: Boolean = false,
-    val cleanedUri: String? = null
+    val cleanedUri: String? = null,
+    val sessionId: Long = 0L
 )
 
 data class ImageMetadata(
