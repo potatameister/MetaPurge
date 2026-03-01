@@ -745,8 +745,7 @@ private fun SupportSection() {
                 .fillMaxWidth()
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalArrangement = Arrangement.Center
         ) {
             Icon(
                 Icons.Default.Favorite,
