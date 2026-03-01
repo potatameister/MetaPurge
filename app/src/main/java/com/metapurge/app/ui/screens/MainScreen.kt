@@ -94,20 +94,14 @@ fun MainScreen() {
                             model = R.drawable.ic_launcher,
                             contentDescription = "MetaPurge Icon",
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(48.dp)
                                 .clip(RoundedCornerShape(10.dp)),
                             contentScale = ContentScale.Crop
                         )
                         Text(
-                            "Meta",
+                            "MetaPurge",
                             fontWeight = FontWeight.Bold,
                             color = White,
-                            fontSize = 20.sp
-                        )
-                        Text(
-                            "Purge",
-                            fontWeight = FontWeight.Bold,
-                            color = SkyBlue,
                             fontSize = 20.sp
                         )
                     }

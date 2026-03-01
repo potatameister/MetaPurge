@@ -202,9 +202,11 @@ class MetadataRepository(private val context: Context) {
                     break
                 }
 
-                if (marker == 0xD8 || marker == 0xD9) {
-                    output.add(input[i])
-                    output.add(input[i + 1])
+                if (marker == 0xD8) {
+                    i += 2
+                } else if (marker == 0xD9) {
+                    output.add(0xFF.toByte())
+                    output.add(0xD9.toByte())
                     i += 2
                 } else {
                     if (i + 3 < input.size) {
