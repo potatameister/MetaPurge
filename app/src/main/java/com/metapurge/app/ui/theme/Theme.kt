@@ -7,19 +7,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-
-val DarkNavy = Color(0xFF0B1120)
-val DarkNavyLight = Color(0xFF1E293B)
-val SkyBlue = Color(0xFF38BDF8)
-val SkyBlueDark = Color(0xFF0EA5E9)
-val White = Color(0xFFFFFFFF)
-val SlateGray = Color(0xFF94A3B8)
-val SlateDark = Color(0xFF475569)
 
 private val DarkColorScheme = darkColorScheme(
     primary = SkyBlue,
