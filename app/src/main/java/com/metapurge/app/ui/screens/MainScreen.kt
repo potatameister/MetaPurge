@@ -46,11 +46,7 @@ fun MainScreen(
     onToggleTheme: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val images by remember { mutableStateOf(MutableStateFlow(emptyList<ImageItem>())) }
-    val stats by remember { mutableStateOf(MutableStateFlow(Stats())) }
-    val isProcessing by remember { mutableStateOf(MutableStateFlow(false)) }
-    val toast by remember { mutableStateOf(MutableStateFlow<String?>(null)) }
-
+    
     val viewModel: MainViewModel = viewModel()
     
     val imagesState by viewModel.images.collectAsState()
