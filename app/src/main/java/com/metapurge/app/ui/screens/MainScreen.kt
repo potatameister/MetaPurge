@@ -147,7 +147,6 @@ fun MainScreen() {
 }
 
 @Composable
-@Composable
 private fun UploadZone(onClick: () -> Unit) {
     Card(
         modifier = Modifier
