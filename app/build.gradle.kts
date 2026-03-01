@@ -20,20 +20,15 @@ android {
         }
     }
 
-    val keystoreFile = System.getenv("KEYSTORE_FILE")?.let { encoded ->
-        val decoded = java.util.Base64.getDecoder().decode(encoded)
-        val tempFile = java.io.File.createTempFile("metapurge", ".jks")
-        tempFile.writeBytes(decoded)
-        tempFile.deleteOnExit()
-        tempFile
-    }
-
-    signingConfigs {
-        create("release") {
-            keystoreFile?.let { storeFile = it }
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "changeit"
-            keyAlias = System.getenv("KEY_ALIAS") ?: "metapurge"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: "changeit"
+    if (System.getenv("KEYSTORE_FILE") != null) {
+        signingConfigs {
+            create("release") {
+                val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${System.getProperty("user.home")}/keystore/metapurge.jks"
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+                keyAlias = System.getenv("KEY_ALIAS") ?: ""
+                keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+            }
         }
     }
 
@@ -69,14 +64,6 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
-}
-
-androidComponents {
-    onVariants(selector().all()) { variant ->
-        variant.outputs.configureEach {
-            it.outputFileName.set("MetaPurge.apk")
         }
     }
 }

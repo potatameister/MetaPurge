@@ -22,11 +22,9 @@ jobs:
           cache: 'gradle'
 
       - name: Create Keystore
+        if: env.KEYSTORE_FILE != null
         env:
           KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           mkdir -p ~/keystore
           echo "$KEYSTORE_FILE" | base64 -d > ~/keystore/metapurge.jks
@@ -40,6 +38,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PATH: ~/keystore/metapurge.jks
         run: ./gradlew assembleRelease
 
       - name: Upload APK
