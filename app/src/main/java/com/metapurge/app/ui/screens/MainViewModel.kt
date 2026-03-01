@@ -102,7 +102,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 statsRepository.incrementStats(1, metadataSize, if (hasGps) 1 else 0)
                 showToast("Metadata removed successfully!")
             } else {
-                showToast("Error: Could not process image. Try again.")
+                showToast("Error: Could not process image")
             }
         }
     }

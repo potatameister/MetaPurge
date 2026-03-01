@@ -97,14 +97,20 @@ fun MainScreen() {
                             ),
                             contentDescription = "MetaPurge Icon",
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(44.dp)
                                 .clip(RoundedCornerShape(10.dp)),
                             contentScale = ContentScale.Crop
                         )
                         Text(
-                            "MetaPurge",
+                            "Meta",
                             fontWeight = FontWeight.Bold,
                             color = White,
+                            fontSize = 20.sp
+                        )
+                        Text(
+                            "Purge",
+                            fontWeight = FontWeight.Bold,
+                            color = SkyBlue,
                             fontSize = 20.sp
                         )
                     }
@@ -113,6 +119,7 @@ fun MainScreen() {
                     containerColor = DarkNavy,
                     titleContentColor = White
                 ),
+                shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
                 actions = {
                     IconButton(onClick = { showInfoModal = true }) {
                         Icon(
