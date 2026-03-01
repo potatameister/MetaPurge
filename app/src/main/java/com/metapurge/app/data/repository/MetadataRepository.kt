@@ -194,15 +194,22 @@ class MetadataRepository(private val context: Context) {
                 } else {
                     if (i + 3 < input.size) {
                         val len = ((input[i + 2].toInt() and 0xFF) shl 8) or (input[i + 3].toInt() and 0xFF)
-                        for (j in 0 until len + 2) {
-                            output.add(input[i + j])
+                        if (len > 0 && len < input.size - i - 2) {
+                            for (j in 0 until len + 2) {
+                                output.add(input[i + j])
+                            }
+                            i += len + 2
+                        } else {
+                            output.add(input[i])
+                            output.add(input[i + 1])
+                            i += 2
                         }
-                        i += len + 2
                     } else {
                         i++
                     }
                 }
             } else {
+                output.add(input[i])
                 i++
             }
         }

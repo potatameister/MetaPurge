@@ -12,7 +12,7 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "v1.0"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -23,6 +23,8 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            isDebuggable = false
+            isZipAlignEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -50,6 +52,16 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+android.applicationVariants.all {
+    val variant = this
+    variant.outputs.forEach { output ->
+        val outputFile = output.outputFileName
+        if (outputFile != null && outputFile.endsWith(".apk")) {
+            output.outputFileName = "MetaPurge.apk"
         }
     }
 }

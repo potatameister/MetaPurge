@@ -45,7 +45,6 @@ fun MainScreen() {
     
     val viewModel: MainViewModel = viewModel()
     val images by viewModel.images.collectAsState()
-    val stats by viewModel.stats.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
     val toast by viewModel.toast.collectAsState()
 
@@ -68,7 +67,7 @@ fun MainScreen() {
     }
 
     Scaffold(
-        containerColor = DarkNavy,
+        containerColor = White,
         topBar = {
             TopAppBar(
                 title = {
@@ -114,14 +113,6 @@ fun MainScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                StatsRow(
-                    filesPurged = stats.filesPurged,
-                    dataRemoved = viewModel.formatBytes(stats.dataRemoved),
-                    gpsFound = stats.gpsFound
-                )
-            }
-
-            item {
                 UploadZone(onClick = { launcher.launch("image/jpeg") })
             }
 
@@ -156,57 +147,6 @@ fun MainScreen() {
 }
 
 @Composable
-private fun StatsRow(filesPurged: Int, dataRemoved: String, gpsFound: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        StatCard(
-            value = filesPurged.toString(),
-            label = "Files Purged",
-            modifier = Modifier.weight(1f)
-        )
-        StatCard(
-            value = dataRemoved,
-            label = "Data Removed",
-            modifier = Modifier.weight(1f)
-        )
-        StatCard(
-            value = gpsFound.toString(),
-            label = "GPS Found",
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-private fun StatCard(value: String, label: String, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = DarkNavyLight),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                value,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = White
-            )
-            Text(
-                label,
-                fontSize = 12.sp,
-                color = SlateGray
-            )
-        }
-    }
-}
-
 @Composable
 private fun UploadZone(onClick: () -> Unit) {
     Card(
