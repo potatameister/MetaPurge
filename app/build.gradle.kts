@@ -20,12 +20,20 @@ android {
         }
     }
 
+    val keystoreFile = System.getenv("KEYSTORE_FILE")?.let { encoded ->
+        val decoded = java.util.Base64.getDecoder().decode(encoded)
+        val tempFile = java.io.File.createTempFile("metapurge", ".jks")
+        tempFile.writeBytes(decoded)
+        tempFile.deleteOnExit()
+        tempFile
+    }
+
     signingConfigs {
         create("release") {
-            storeFile = file("${System.getProperty("user.home")}/downloads/key/metapurge/metapurge.jks")
-            storePassword = "M3t4Purg3!2026"
-            keyAlias = "metapurge"
-            keyPassword = "M3t4Purg3!2026"
+            keystoreFile?.let { storeFile = it }
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "changeit"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "metapurge"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "changeit"
         }
     }
 
@@ -34,7 +42,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             isDebuggable = false
-            signingConfig = signingConfigs.getByName("release")
+            if (System.getenv("KEYSTORE_FILE") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -59,6 +69,14 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.configureEach {
+            it.outputFileName.set("MetaPurge.apk")
         }
     }
 }
