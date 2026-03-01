@@ -1,40 +1,43 @@
 <svg width="512" height="512" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Base (Deep Slate Blue - Professional & Security focused) -->
-  <rect width="256" height="256" rx="56" fill="#0F172A" />
-  
-  <!-- Photo Frame -->
-  <rect x="48" y="48" width="160" height="160" rx="16" fill="#FFFFFF" />
-  
-  <!-- Inner Photo Mask -->
-  <mask id="photoMask">
-    <rect x="48" y="48" width="160" height="160" rx="16" fill="#FFFFFF" />
-  </mask>
-  
-  <g mask="url(#photoMask)">
-    <!-- Abstract Geometric Mountains (Minimalist, no sky/sun) -->
-    <path d="M 20 208 L 104 96 L 160 176 Z" fill="#E2E8F0" />
-    <path d="M 104 208 L 168 120 L 240 208 Z" fill="#CBD5E1" />
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="8" dy="12" stdDeviation="12" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+
+  <!-- Pure Square Background (Dark Navy) -->
+  <rect width="256" height="256" fill="#0B1120" />
+
+
+  <!-- BACK LAYER: Extracted Metadata & Location (Sky Blue) -->
+  <g>
+    <!-- Dashed Outline -->
+    <rect x="112" y="112" width="104" height="104" rx="20" stroke="#38BDF8" stroke-width="4" stroke-dasharray="8 8" fill="none" />
     
-    <!-- Metadata / EXIF Data Pattern (Only visible below the scanner) -->
-    <g fill="#0F172A">
-      <rect x="64" y="160" width="32" height="6" rx="3" />
-      <rect x="104" y="160" width="48" height="6" rx="3" />
-      <rect x="160" y="160" width="16" height="6" rx="3" />
-      
-      <rect x="64" y="176" width="64" height="6" rx="3" />
-      <rect x="136" y="176" width="24" height="6" rx="3" />
-      <rect x="168" y="176" width="24" height="6" rx="3" />
-      
-      <rect x="64" y="192" width="24" height="6" rx="3" />
-      <rect x="96" y="192" width="56" height="6" rx="3" />
-      <rect x="160" y="192" width="32" height="6" rx="3" />
-    </g>
+    <!-- Location Pin -->
+    <path d="M164 132 C 155.2 132 148 139.2 148 148 C 148 160 164 176 164 176 C 164 176 180 160 180 148 C 180 139.2 172.8 132 164 132 Z" stroke="#38BDF8" stroke-width="4" fill="none" stroke-linejoin="round" />
+    <circle cx="164" cy="148" r="4" fill="#38BDF8" />
+    
+    <!-- EXIF Code Lines -->
+    <rect x="140" y="184" width="48" height="6" rx="3" fill="#38BDF8" />
+    <rect x="148" y="196" width="32" height="6" rx="3" fill="#38BDF8" />
   </g>
-  
-  <!-- Laser Scanner (Red Accent #E11D48) -->
-  <rect x="32" y="140" width="192" height="4" fill="#E11D48" />
-  
-  <!-- Laser Nodes/Edges -->
-  <rect x="28" y="136" width="8" height="12" rx="2" fill="#E11D48" />
-  <rect x="220" y="136" width="8" height="12" rx="2" fill="#E11D48" />
+
+
+  <!-- FRONT LAYER: Clean Photo (White) -->
+  <g filter="url(#shadow)">
+    <!-- Solid Photo Frame -->
+    <rect x="40" y="40" width="104" height="104" rx="20" fill="#FFFFFF" />
+    
+    <!-- Clean Sparkle -->
+    <path d="M 56 60 Q 64 60 64 52 Q 64 60 72 60 Q 64 60 64 68 Q 64 60 56 60 Z" fill="#38BDF8" />
+    
+    <!-- Minimalist Sun -->
+    <circle cx="112" cy="72" r="12" fill="#CBD5E1" />
+    
+    <!-- Geometric Mountains -->
+    <path d="M 52 124 L 84 76 L 116 124 Z" fill="#0B1120" />
+    <path d="M 96 124 L 116 96 L 136 124 Z" fill="#475569" />
+  </g>
 </svg>
