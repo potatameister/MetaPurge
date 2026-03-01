@@ -147,10 +147,10 @@ fun MainScreen() {
                         if (hasImages) {
                             CompactUploadZone(
                                 count = images.size,
-                                onClick = { launcher.launch("image/jpeg") }
+                                onClick = { launcher.launch("image/*") }
                             )
                         } else {
-                            UploadZone(onClick = { launcher.launch("image/jpeg") })
+                            UploadZone(onClick = { launcher.launch("image/*") })
                         }
                     }
                 }
@@ -169,59 +169,62 @@ fun MainScreen() {
                 val groupedImages = images.groupBy { it.sessionId }
                 
                 groupedImages.forEach { (sessionId, sessionImages) ->
-                    item(key = "divider_$sessionId") {
-                        if (images.indexOf(sessionImages.first()) != 0) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                thickness = 1.dp,
-                                color = DarkNavy.copy(alpha = 0.1f)
-                            )
-                        }
-                    }
+                    item(key = "session_$sessionId") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(
+                                    BorderStroke(1.5.dp, DarkNavy.copy(alpha = 0.2f)),
+                                    RoundedCornerShape(24.dp)
+                                )
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            sessionImages.forEach { image ->
+                                val dismissState = rememberSwipeToDismissBoxState(
+                                    confirmValueChange = {
+                                        if (it == SwipeToDismissBoxValue.EndToStart) {
+                                            viewModel.removeImage(image.id)
+                                            true
+                                        } else false
+                                    }
+                                )
 
-                    items(sessionImages, key = { it.id }) { image ->
-                        val dismissState = rememberSwipeToDismissBoxState(
-                            confirmValueChange = {
-                                if (it == SwipeToDismissBoxValue.EndToStart) {
-                                    viewModel.removeImage(image.id)
-                                    true
-                                } else false
-                            }
-                        )
-
-                        SwipeToDismissBox(
-                            state = dismissState,
-                            enableDismissFromStartToEnd = false,
-                            backgroundContent = {
-                                val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-                                    Color.Red.copy(alpha = 0.8f)
-                                } else Color.Transparent
-                                
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .background(color)
-                                        .padding(horizontal = 20.dp),
-                                    contentAlignment = Alignment.CenterEnd
-                                ) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Delete",
-                                        tint = White
-                                    )
-                                }
-                            },
-                            content = {
-                                ImageCard(
-                                    image = image,
-                                    onPurge = { viewModel.purgeImage(image.id) },
-                                    onRemove = { viewModel.removeImage(image.id) },
-                                    onShare = { shareImage(context, image) },
-                                    formatBytes = viewModel::formatBytes
+                                SwipeToDismissBox(
+                                    state = dismissState,
+                                    enableDismissFromStartToEnd = false,
+                                    backgroundContent = {
+                                        val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                                            Color.Red.copy(alpha = 0.8f)
+                                        } else Color.Transparent
+                                        
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(RoundedCornerShape(20.dp))
+                                                .background(color)
+                                                .padding(horizontal = 20.dp),
+                                            contentAlignment = Alignment.CenterEnd
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "Delete",
+                                                tint = White
+                                            )
+                                        }
+                                    },
+                                    content = {
+                                        ImageCard(
+                                            image = image,
+                                            onPurge = { viewModel.purgeImage(image.id) },
+                                            onRemove = { viewModel.removeImage(image.id) },
+                                            onShare = { shareImage(context, image) },
+                                            formatBytes = viewModel::formatBytes
+                                        )
+                                    }
                                 )
                             }
-                        )
+                        }
                     }
                 }
 
@@ -245,9 +248,16 @@ fun MainScreen() {
 private fun shareImage(context: android.content.Context, image: ImageItem) {
     val uriString = image.cleanedUri ?: image.uri
     val uri = Uri.parse(uriString)
+    val lowerUri = uriString.lowercase()
+    val mimeType = when {
+        lowerUri.endsWith(".png") -> "image/png"
+        lowerUri.endsWith(".webp") -> "image/webp"
+        lowerUri.endsWith(".gif") -> "image/gif"
+        else -> "image/jpeg"
+    }
     
     val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "image/jpeg"
+        type = mimeType
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
@@ -620,8 +630,6 @@ private fun ImageCard(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(max = 300.dp)
-                                    .verticalScroll(rememberScrollState())
                                     .background(DarkNavy.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
                                     .padding(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -661,6 +669,42 @@ private fun ImageCard(
                                     )
                                     metadata.allTags.gps.forEach { (key, value) ->
                                         FullMetadataRow(key, value)
+                                    }
+                                }
+
+                                if (metadata.allTags.technical.isNotEmpty()) {
+                                    var showTechnical by remember { mutableStateOf(false) }
+                                    
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 8.dp)
+                                    ) {
+                                        TextButton(
+                                            onClick = { showTechnical = !showTechnical },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(
+                                                if (showTechnical) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = SlateDark
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                if (showTechnical) "Hide Technical Data" else "View ${metadata.allTags.technical.size} Technical Tags",
+                                                color = SlateDark,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+
+                                        AnimatedVisibility(visible = showTechnical) {
+                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                metadata.allTags.technical.forEach { (key, value) ->
+                                                    FullMetadataRow(key, value)
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

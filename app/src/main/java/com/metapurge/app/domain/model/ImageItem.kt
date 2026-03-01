@@ -31,7 +31,8 @@ data class GpsData(
 data class AllTags(
     val image: Map<String, String>,
     val exif: Map<String, String>,
-    val gps: Map<String, String>
+    val gps: Map<String, String>,
+    val technical: Map<String, String> = emptyMap()
 )
 
 data class Stats(
