@@ -1,7 +1,6 @@
 package com.metapurge.app.ui.screens
 
 import android.net.Uri
-import android.os.Environment
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,6 +9,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -42,52 +42,75 @@ import kotlinx.coroutines.delay
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    mainViewModel: MainViewModel = viewModel()
+    isDarkMode: Boolean = true,
+    onToggleTheme: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val images by mainViewModel.images.collectAsState()
-    val stats by mainViewModel.stats.collectAsState()
-    val isProcessing by mainViewModel.isProcessing.collectAsState()
-    val toast by mainViewModel.toast.collectAsState()
+    val images by remember { mutableStateOf(MutableStateFlow(emptyList<ImageItem>())) }
+    val stats by remember { mutableStateOf(MutableStateFlow(Stats())) }
+    val isProcessing by remember { mutableStateOf(MutableStateFlow(false)) }
+    val toast by remember { mutableStateOf(MutableStateFlow<String?>(null)) }
 
+    val viewModel: MainViewModel = viewModel()
+    
+    val imagesState by viewModel.images.collectAsState()
+    val statsState by viewModel.stats.collectAsState()
+    val isProcessingState by viewModel.isProcessing.collectAsState()
+    val toastState by viewModel.toast.collectAsState()
+
+    val backgroundColor = if (isDarkMode) DarkNavy else Color(0xFFF8FAFC)
+    val surfaceColor = if (isDarkMode) DarkNavyLight else White
+    val textColor = if (isDarkMode) White else DarkNavy
+    val textSecondary = if (isDarkMode) SlateGray else SlateDark
+    val cardColor = if (isDarkMode) DarkNavyLight else White
+    
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
         if (uris.isNotEmpty()) {
-            mainViewModel.processUris(uris)
+            viewModel.processUris(uris)
         }
     }
 
     var showInfoModal by remember { mutableStateOf(false) }
 
-    LaunchedEffect(toast) {
-        if (toast != null) {
-            Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
+    LaunchedEffect(toastState) {
+        if (toastState != null) {
+            Toast.makeText(context, toastState, Toast.LENGTH_SHORT).show()
             delay(2000)
-            mainViewModel.dismissToast()
+            viewModel.dismissToast()
         }
     }
 
     Scaffold(
-        containerColor = DarkNavy,
+        containerColor = backgroundColor,
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        "MetaPurge",
-                        fontWeight = FontWeight.Bold,
-                        color = White
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "MetaPurge",
+                            fontWeight = FontWeight.Bold,
+                            color = textColor
+                        )
+                    }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkNavy,
-                    titleContentColor = White
-                ),
                 actions = {
+                    IconButton(onClick = onToggleTheme) {
+                        Icon(
+                            if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = "Toggle theme",
+                            tint = textSecondary
+                        )
+                    }
                     IconButton(onClick = { showInfoModal = true }) {
                         Icon(Icons.Default.Info, contentDescription = "Info", tint = SkyBlue)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = backgroundColor,
+                    titleContentColor = textColor
+                )
             )
         }
     ) { paddingValues ->
@@ -98,26 +121,29 @@ fun MainScreen(
                 .padding(horizontal = 16.dp)
         ) {
             StatsRow(
-                filesPurged = stats.filesPurged,
-                dataRemoved = mainViewModel.formatBytes(stats.dataRemoved),
-                gpsFound = stats.gpsFound
+                filesPurged = statsState.filesPurged,
+                dataRemoved = viewModel.formatBytes(statsState.dataRemoved),
+                gpsFound = statsState.gpsFound,
+                isDarkMode = isDarkMode
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             UploadZone(
-                onClick = { launcher.launch("image/jpeg") }
+                onClick = { launcher.launch("image/jpeg") },
+                isDarkMode = isDarkMode
             )
 
             AnimatedVisibility(
-                visible = images.isNotEmpty(),
+                visible = imagesState.isNotEmpty(),
                 modifier = Modifier.padding(vertical = 12.dp)
             ) {
                 BatchActions(
-                    count = images.count { !it.isPurged && it.metadata?.hasExif == true },
-                    isProcessing = isProcessing,
-                    onPurgeAll = { mainViewModel.purgeAll() },
-                    onClear = { mainViewModel.clearAll() }
+                    count = imagesState.count { !it.isPurged && it.metadata?.hasExif == true },
+                    isProcessing = isProcessingState,
+                    onPurgeAll = { viewModel.purgeAll() },
+                    onClear = { viewModel.clearAll() },
+                    isDarkMode = isDarkMode
                 )
             }
 
@@ -125,11 +151,12 @@ fun MainScreen(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(images, key = { it.id }) { image ->
+                items(imagesState, key = { it.id }) { image ->
                     ImageCard(
                         image = image,
-                        onPurge = { mainViewModel.purgeImage(image.id) },
-                        formatBytes = mainViewModel::formatBytes
+                        onPurge = { viewModel.purgeImage(image.id) },
+                        formatBytes = viewModel::formatBytes,
+                        isDarkMode = isDarkMode
                     )
                 }
                 item {
@@ -139,7 +166,7 @@ fun MainScreen(
         }
 
         if (showInfoModal) {
-            InfoModal(onDismiss = { showInfoModal = false })
+            InfoModal(onDismiss = { showInfoModal = false }, isDarkMode = isDarkMode)
         }
     }
 }
@@ -148,8 +175,11 @@ fun MainScreen(
 private fun StatsRow(
     filesPurged: Int,
     dataRemoved: String,
-    gpsFound: Int
+    gpsFound: Int,
+    isDarkMode: Boolean
 ) {
+    val surfaceColor = if (isDarkMode) DarkNavyLight else White
+    
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -157,17 +187,20 @@ private fun StatsRow(
         StatCard(
             value = filesPurged.toString(),
             label = "Files Purged",
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            isDarkMode = isDarkMode
         )
         StatCard(
             value = dataRemoved,
             label = "Data Removed",
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            isDarkMode = isDarkMode
         )
         StatCard(
             value = gpsFound.toString(),
             label = "GPS Found",
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            isDarkMode = isDarkMode
         )
     }
 }
@@ -176,11 +209,16 @@ private fun StatsRow(
 private fun StatCard(
     value: String,
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isDarkMode: Boolean
 ) {
+    val surfaceColor = if (isDarkMode) DarkNavyLight else White
+    val textPrimary = if (isDarkMode) White else DarkNavy
+    val textSecondary = if (isDarkMode) SlateGray else SlateDark
+    
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = DarkNavyLight),
+        colors = CardDefaults.cardColors(containerColor = surfaceColor),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
@@ -198,19 +236,22 @@ private fun StatCard(
             Text(
                 label,
                 fontSize = 12.sp,
-                color = SlateGray
+                color = textSecondary
             )
         }
     }
 }
 
 @Composable
-private fun UploadZone(onClick: () -> Unit) {
+private fun UploadZone(onClick: () -> Unit, isDarkMode: Boolean) {
+    val cardColor = if (isDarkMode) DarkNavyLight else White
+    val textPrimary = if (isDarkMode) White else DarkNavy
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = White),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         shape = RoundedCornerShape(24.dp)
     ) {
         Column(
@@ -223,7 +264,7 @@ private fun UploadZone(onClick: () -> Unit) {
                 modifier = Modifier
                     .size(72.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(SkyBlue.copy(alpha = 0.1f)),
+                    .background(SkyBlue.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -240,7 +281,7 @@ private fun UploadZone(onClick: () -> Unit) {
                 "Select Photos",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = DarkNavy
+                color = textPrimary
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -274,8 +315,11 @@ private fun BatchActions(
     count: Int,
     isProcessing: Boolean,
     onPurgeAll: () -> Unit,
-    onClear: () -> Unit
+    onClear: () -> Unit,
+    isDarkMode: Boolean
 ) {
+    val textOnPrimary = if (isDarkMode) White else DarkNavy
+    
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -293,14 +337,14 @@ private fun BatchActions(
             if (isProcessing) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(18.dp),
-                    color = DarkNavy,
+                    color = textOnPrimary,
                     strokeWidth = 2.dp
                 )
             } else {
                 Icon(Icons.Default.CleaningServices, contentDescription = null, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(8.dp))
-            Text("Purge All ($count)", color = DarkNavy, fontWeight = FontWeight.SemiBold)
+            Text("Purge All ($count)", color = textOnPrimary, fontWeight = FontWeight.SemiBold)
         }
 
         OutlinedButton(
@@ -317,7 +361,8 @@ private fun BatchActions(
 private fun ImageCard(
     image: ImageItem,
     onPurge: () -> Unit,
-    formatBytes: (Long) -> String
+    formatBytes: (Long) -> String,
+    isDarkMode: Boolean
 ) {
     val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
@@ -325,12 +370,16 @@ private fun ImageCard(
         targetValue = if (expanded) 180f else 0f,
         label = "rotation"
     )
+    
+    val cardColor = if (isDarkMode) DarkNavyLight else White
+    val textPrimary = if (isDarkMode) White else DarkNavy
+    val textSecondary = if (isDarkMode) SlateGray else SlateDark
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        colors = CardDefaults.cardColors(containerColor = White),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
         shape = RoundedCornerShape(20.dp)
     ) {
         Column {
@@ -353,7 +402,7 @@ private fun ImageCard(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(SkyBlue.copy(alpha = 0.8f)),
+                            .background(SkyBlue.copy(alpha = 0.85f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -425,7 +474,7 @@ private fun ImageCard(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(DarkNavy.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                                .background(if (isDarkMode) DarkNavy.copy(alpha = 0.3f) else Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -442,13 +491,13 @@ private fun ImageCard(
                                 )
                                 Column {
                                     Text(
-                                        "$totalTags metadata tags found",
+                                        "$totalTags metadata tags",
                                         fontWeight = FontWeight.SemiBold,
-                                        color = DarkNavy
+                                        color = textPrimary
                                     )
                                     metadata.gps?.let {
                                         Text(
-                                            "⚠️ GPS Location detected",
+                                            "GPS Location detected",
                                             fontSize = 12.sp,
                                             color = Color(0xFFDC2626)
                                         )
@@ -459,16 +508,16 @@ private fun ImageCard(
 
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             metadata.dateTime?.let {
-                                MetadataRow(icon = Icons.Default.Schedule, label = "Date", value = it)
+                                MetadataRow(icon = Icons.Default.Schedule, label = "Date", value = it, isDarkMode = isDarkMode)
                             }
                             metadata.gps?.let {
-                                MetadataRow(icon = Icons.Default.LocationOn, label = "Location", value = it.display)
+                                MetadataRow(icon = Icons.Default.LocationOn, label = "Location", value = it.display, isDarkMode = isDarkMode)
                             }
                             metadata.camera?.let {
-                                MetadataRow(icon = Icons.Default.PhoneAndroid, label = "Device", value = it)
+                                MetadataRow(icon = Icons.Default.PhoneAndroid, label = "Device", value = it, isDarkMode = isDarkMode)
                             }
                             metadata.software?.let {
-                                MetadataRow(icon = Icons.Default.Code, label = "Software", value = it)
+                                MetadataRow(icon = Icons.Default.Code, label = "Software", value = it, isDarkMode = isDarkMode)
                             }
                         }
 
@@ -479,10 +528,11 @@ private fun ImageCard(
                             Icon(
                                 Icons.Default.ExpandMore,
                                 contentDescription = null,
-                                modifier = Modifier.rotate(rotationState)
+                                modifier = Modifier.rotate(rotationState),
+                                tint = SkyBlue
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (expanded) "Show Less" else "View All $totalTags Tags")
+                            Text(if (expanded) "Show Less" else "View All $totalTags Tags", color = SkyBlue)
                         }
 
                         AnimatedVisibility(visible = expanded) {
@@ -490,7 +540,7 @@ private fun ImageCard(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .verticalScroll(rememberScrollState())
-                                    .background(DarkNavy.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                                    .background(if (isDarkMode) DarkNavy.copy(alpha = 0.2f) else Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
                                     .padding(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
@@ -498,11 +548,11 @@ private fun ImageCard(
                                     Text(
                                         "Image Info",
                                         fontWeight = FontWeight.Bold,
-                                        color = DarkNavy,
+                                        color = textPrimary,
                                         fontSize = 14.sp
                                     )
                                     metadata.allTags.image.forEach { (key, value) ->
-                                        FullMetadataRow(key, value)
+                                        FullMetadataRow(key, value, isDarkMode)
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                 }
@@ -511,11 +561,11 @@ private fun ImageCard(
                                     Text(
                                         "EXIF Data",
                                         fontWeight = FontWeight.Bold,
-                                        color = DarkNavy,
+                                        color = textPrimary,
                                         fontSize = 14.sp
                                     )
                                     metadata.allTags.exif.forEach { (key, value) ->
-                                        FullMetadataRow(key, value)
+                                        FullMetadataRow(key, value, isDarkMode)
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                 }
@@ -528,7 +578,7 @@ private fun ImageCard(
                                         fontSize = 14.sp
                                     )
                                     metadata.allTags.gps.forEach { (key, value) ->
-                                        FullMetadataRow(key, value)
+                                        FullMetadataRow(key, value, isDarkMode)
                                     }
                                 }
                             }
@@ -570,8 +620,12 @@ private fun ImageCard(
 private fun MetadataRow(
     icon: ImageVector,
     label: String,
-    value: String
+    value: String,
+    isDarkMode: Boolean
 ) {
+    val textPrimary = if (isDarkMode) White else DarkNavy
+    val textSecondary = if (isDarkMode) SlateGray else SlateDark
+    
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -584,14 +638,17 @@ private fun MetadataRow(
             modifier = Modifier.size(18.dp)
         )
         Column {
-            Text(label, fontSize = 11.sp, color = SlateGray)
-            Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = DarkNavy)
+            Text(label, fontSize = 11.sp, color = textSecondary)
+            Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = textPrimary)
         }
     }
 }
 
 @Composable
-private fun FullMetadataRow(key: String, value: String) {
+private fun FullMetadataRow(key: String, value: String, isDarkMode: Boolean) {
+    val textPrimary = if (isDarkMode) White else DarkNavy
+    val textSecondary = if (isDarkMode) SlateGray else SlateDark
+    
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
@@ -599,14 +656,14 @@ private fun FullMetadataRow(key: String, value: String) {
         Text(
             key.replace("_", " "),
             fontSize = 12.sp,
-            color = SlateGray,
+            color = textSecondary,
             modifier = Modifier.weight(1f)
         )
         Text(
             value,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
-            color = DarkNavy,
+            color = textPrimary,
             modifier = Modifier.weight(1.5f),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -616,10 +673,14 @@ private fun FullMetadataRow(key: String, value: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InfoModal(onDismiss: () -> Unit) {
+private fun InfoModal(onDismiss: () -> Unit, isDarkMode: Boolean) {
+    val cardColor = if (isDarkMode) DarkNavyLight else White
+    val textPrimary = if (isDarkMode) White else DarkNavy
+    val textSecondary = if (isDarkMode) SlateGray else SlateDark
+    
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = White,
+        containerColor = cardColor,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Column(
@@ -631,7 +692,7 @@ private fun InfoModal(onDismiss: () -> Unit) {
                 "About MetaPurge",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = DarkNavy
+                color = textPrimary
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -639,7 +700,7 @@ private fun InfoModal(onDismiss: () -> Unit) {
             Text(
                 "Every photo contains hidden EXIF metadata - including GPS location, device info, and timestamps. MetaPurge removes all of it, keeping only the pixels.",
                 fontSize = 14.sp,
-                color = SlateDark,
+                color = textSecondary,
                 lineHeight = 20.sp
             )
 

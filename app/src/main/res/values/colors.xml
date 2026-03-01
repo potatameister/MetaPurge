@@ -1,18 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg_primary">#0f172a</color>
-    <color name="bg_secondary">#1e293b</color>
+    <!-- Primary Theme Colors -->
+    <color name="dark_navy">#0B1120</color>
+    <color name="dark_navy_light">#1E293B</color>
+    <color name="sky_blue">#38BDF8</color>
+    <color name="sky_blue_dark">#0EA5E9</color>
+    <color name="white">#FFFFFF</color>
+    <color name="slate_gray">#94A3B8</color>
+    <color name="slate_dark">#475569</color>
+    
+    <!-- Legacy colors (kept for compatibility) -->
+    <color name="bg_primary">#0B1120</color>
+    <color name="bg_secondary">#1E293B</color>
     <color name="bg_tertiary">#334155</color>
-    <color name="text_primary">#f8fafc</color>
-    <color name="text_secondary">#cbd5e1</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#94A3B8</color>
     <color name="text_muted">#64748b</color>
     <color name="border_color">#334155</color>
-    <color name="accent">#ef4444</color>
-    <color name="accent_secondary">#f97316</color>
+    <color name="accent">#38BDF8</color>
+    <color name="accent_secondary">#0EA5E9</color>
     <color name="success">#22c55e</color>
-    <color name="success_bg">#1a22c55e</color>
-    <color name="danger_bg">#26ef4444</color>
-    <color name="danger_border">#4cef4444</color>
-    <color name="white">#ffffff</color>
-    <color name="black">#000000</color>
+    <color name="success_bg">#1A22C55E</color>
+    <color name="danger_bg">#26DC2626</color>
+    <color name="danger_border">#4CDC2626</color>
 </resources>

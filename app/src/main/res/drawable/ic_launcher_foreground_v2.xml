@@ -1,0 +1,44 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Background layer -->
+    <path
+        android:fillColor="#0B1120"
+        android:pathData="M0,0h108v108H0z"/>
+    
+    <!-- Photo frame outline - sky blue -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M24,24h60v60h-60z"/>
+    
+    <!-- White inner frame -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,28h52v52h-52z"/>
+    
+    <!-- Abstract mountain 1 - dark -->
+    <path
+        android:fillColor="#0B1120"
+        android:pathData="M30,76L52,48L74,76z"/>
+    
+    <!-- Abstract mountain 2 - slate -->
+    <path
+        android:fillColor="#475569"
+        android:pathData="M52,76L66,58L80,76z"/>
+    
+    <!-- Metadata bars -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M34,66h12v3h-12zM50,66h18v3h-18z"/>
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M34,72h24v3h-24z"/>
+    
+    <!-- Scanner line -->
+    <path
+        android:fillColor="#DC2626"
+        android:pathData="M20,55h68v2h-68z"/>
+</vector>
