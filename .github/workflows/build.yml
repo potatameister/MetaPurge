@@ -26,8 +26,8 @@ jobs:
         env:
           KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
         run: |
-          mkdir -p ~/keystore
-          echo "$KEYSTORE_FILE" | base64 -d > ~/keystore/metapurge.jks
+          mkdir -p /home/runner/keystore
+          echo "$KEYSTORE_FILE" | base64 -d > /home/runner/keystore/metapurge.jks
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -38,11 +38,10 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEYSTORE_PATH: ~/keystore/metapurge.jks
         run: ./gradlew assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: MetaPurge-release
-          path: app/build/outputs/apk/release/MetaPurge.apk
+          path: app/build/outputs/apk/release/

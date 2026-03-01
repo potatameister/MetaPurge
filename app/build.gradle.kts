@@ -23,8 +23,7 @@ android {
     if (System.getenv("KEYSTORE_FILE") != null) {
         signingConfigs {
             create("release") {
-                val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${System.getProperty("user.home")}/keystore/metapurge.jks"
-                storeFile = file(keystorePath)
+                storeFile = file("/home/runner/keystore/metapurge.jks")
                 storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
                 keyAlias = System.getenv("KEY_ALIAS") ?: ""
                 keyPassword = System.getenv("KEY_PASSWORD") ?: ""
