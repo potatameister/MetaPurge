@@ -2,16 +2,10 @@ package com.metapurge.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val BgPrimary = Color(0xFF0f172a)
-val BgSecondary = Color(0xFF1e293b)
-val BgTertiary = Color(0xFF334155)
-val TextPrimary = Color(0xFFf8fafc)
-val TextSecondary = Color(0xFFcbd5e1)
-val TextMuted = Color(0xFF64748b)
-val BorderColor = Color(0xFF334155)
-val Accent = Color(0xFFef4444)
-val AccentSecondary = Color(0xFFf97316)
-val Success = Color(0xFF22c55e)
-val SuccessBg = Color(0x1A22c55e)
-val DangerBg = Color(0x26ef4444)
-val DangerBorder = Color(0x4cef4444)
+val DarkNavy = Color(0xFF0B1120)
+val DarkNavyLight = Color(0xFF1E293B)
+val SkyBlue = Color(0xFF38BDF8)
+val SkyBlueDark = Color(0xFF0EA5E9)
+val White = Color(0xFFFFFFFF)
+val SlateGray = Color(0xFF94A3B8)
+val SlateDark = Color(0xFF475569)

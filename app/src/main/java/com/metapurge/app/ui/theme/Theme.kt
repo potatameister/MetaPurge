@@ -11,21 +11,21 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Accent,
-    secondary = AccentSecondary,
-    tertiary = Success,
-    background = BgPrimary,
-    surface = BgSecondary,
-    surfaceVariant = BgTertiary,
-    onPrimary = TextPrimary,
-    onSecondary = TextPrimary,
-    onTertiary = TextPrimary,
-    onBackground = TextPrimary,
-    onSurface = TextPrimary,
-    onSurfaceVariant = TextSecondary,
-    outline = BorderColor,
-    error = Accent,
-    onError = TextPrimary
+    primary = SkyBlue,
+    secondary = SkyBlueDark,
+    tertiary = SkyBlue,
+    background = DarkNavy,
+    surface = White,
+    surfaceVariant = SlateGray,
+    onPrimary = DarkNavy,
+    onSecondary = DarkNavy,
+    onTertiary = DarkNavy,
+    onBackground = White,
+    onSurface = DarkNavy,
+    onSurfaceVariant = SlateDark,
+    outline = SlateGray,
+    error = SkyBlue,
+    onError = White
 )
 
 @Composable
@@ -38,8 +38,8 @@ fun MetaPurgeTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = BgSecondary.toArgb()
-            window.navigationBarColor = BgSecondary.toArgb()
+            window.statusBarColor = DarkNavy.toArgb()
+            window.navigationBarColor = DarkNavy.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
         }
     }

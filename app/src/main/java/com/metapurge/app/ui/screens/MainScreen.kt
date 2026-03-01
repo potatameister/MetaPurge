@@ -1,18 +1,21 @@
 package com.metapurge.app.ui.screens
 
 import android.net.Uri
+import android.os.Environment
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,7 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -29,7 +32,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -42,6 +44,7 @@ import kotlinx.coroutines.delay
 fun MainScreen(
     mainViewModel: MainViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val images by mainViewModel.images.collectAsState()
     val stats by mainViewModel.stats.collectAsState()
     val isProcessing by mainViewModel.isProcessing.collectAsState()
@@ -59,24 +62,48 @@ fun MainScreen(
 
     LaunchedEffect(toast) {
         if (toast != null) {
+            Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
             delay(2000)
             mainViewModel.dismissToast()
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(BgPrimary)) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Header(
-                onInfoClick = { showInfoModal = true }
+    Scaffold(
+        containerColor = DarkNavy,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "MetaPurge",
+                        fontWeight = FontWeight.Bold,
+                        color = White
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DarkNavy,
+                    titleContentColor = White
+                ),
+                actions = {
+                    IconButton(onClick = { showInfoModal = true }) {
+                        Icon(Icons.Default.Info, contentDescription = "Info", tint = SkyBlue)
+                    }
+                }
             )
-
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp)
+        ) {
             StatsRow(
                 filesPurged = stats.filesPurged,
                 dataRemoved = mainViewModel.formatBytes(stats.dataRemoved),
                 gpsFound = stats.gpsFound
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             UploadZone(
                 onClick = { launcher.launch("image/jpeg") }
@@ -84,8 +111,7 @@ fun MainScreen(
 
             AnimatedVisibility(
                 visible = images.isNotEmpty(),
-                enter = fadeIn(),
-                exit = fadeOut()
+                modifier = Modifier.padding(vertical = 12.dp)
             ) {
                 BatchActions(
                     count = images.count { !it.isPurged && it.metadata?.hasExif == true },
@@ -97,7 +123,6 @@ fun MainScreen(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(images, key = { it.id }) { image ->
@@ -107,76 +132,14 @@ fun MainScreen(
                         formatBytes = mainViewModel::formatBytes
                     )
                 }
+                item {
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
             }
-        }
-
-        AnimatedVisibility(
-            visible = toast != null,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 100.dp),
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            Toast(message = toast ?: "")
         }
 
         if (showInfoModal) {
             InfoModal(onDismiss = { showInfoModal = false })
-        }
-    }
-}
-
-@Composable
-private fun Header(onInfoClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(BgSecondary)
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Accent, AccentSecondary)
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.CleaningServices,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Column {
-                Text(
-                    "MetaPurge",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                Text(
-                    "Privacy Tool",
-                    fontSize = 11.sp,
-                    color = TextMuted
-                )
-            }
-        }
-
-        IconButton(onClick = onInfoClick) {
-            Icon(
-                Icons.Default.Info,
-                contentDescription = "Info",
-                tint = TextSecondary
-            )
         }
     }
 }
@@ -188,9 +151,7 @@ private fun StatsRow(
     gpsFound: Int
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         StatCard(
@@ -219,25 +180,25 @@ private fun StatCard(
 ) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = BgSecondary),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = DarkNavyLight),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 value,
-                fontSize = 20.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = Accent
+                color = SkyBlue
             )
             Text(
                 label,
-                fontSize = 11.sp,
-                color = TextMuted
+                fontSize = 12.sp,
+                color = SlateGray
             )
         }
     }
@@ -248,10 +209,9 @@ private fun UploadZone(onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = BgSecondary),
-        shape = RoundedCornerShape(20.dp)
+        colors = CardDefaults.cardColors(containerColor = White),
+        shape = RoundedCornerShape(24.dp)
     ) {
         Column(
             modifier = Modifier
@@ -261,40 +221,34 @@ private fun UploadZone(onClick: () -> Unit) {
         ) {
             Box(
                 modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(BgTertiary),
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(SkyBlue.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.AddPhotoAlternate,
                     contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                    tint = TextMuted
+                    modifier = Modifier.size(36.dp),
+                    tint = SkyBlue
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                "Tap to Select Photos",
-                fontSize = 16.sp,
+                "Select Photos",
+                fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = TextPrimary
+                color = DarkNavy
             )
 
-            Text(
-                "JPEG files",
-                fontSize = 13.sp,
-                color = TextMuted
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier
-                    .background(SuccessBg, RoundedCornerShape(20.dp))
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .background(SkyBlue.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
@@ -302,13 +256,13 @@ private fun UploadZone(onClick: () -> Unit) {
                     Icons.Default.Security,
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
-                    tint = Success
+                    tint = SkyBlue
                 )
                 Text(
                     "100% Offline",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Success
+                    color = SkyBlue
                 )
             }
         }
@@ -323,9 +277,7 @@ private fun BatchActions(
     onClear: () -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Button(
@@ -333,28 +285,28 @@ private fun BatchActions(
             modifier = Modifier.weight(1f),
             enabled = count > 0 && !isProcessing,
             colors = ButtonDefaults.buttonColors(
-                containerColor = Accent,
-                disabledContainerColor = Accent.copy(alpha = 0.5f)
+                containerColor = SkyBlue,
+                disabledContainerColor = SkyBlue.copy(alpha = 0.5f)
             ),
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(16.dp)
         ) {
             if (isProcessing) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(18.dp),
-                    color = Color.White,
+                    color = DarkNavy,
                     strokeWidth = 2.dp
                 )
             } else {
-                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.CleaningServices, contentDescription = null, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(8.dp))
-            Text("Purge All ($count)")
+            Text("Purge All ($count)", color = DarkNavy, fontWeight = FontWeight.SemiBold)
         }
 
         OutlinedButton(
             onClick = onClear,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Accent),
-            shape = RoundedCornerShape(12.dp)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = SlateGray),
+            shape = RoundedCornerShape(16.dp)
         ) {
             Text("Clear")
         }
@@ -368,17 +320,24 @@ private fun ImageCard(
     formatBytes: (Long) -> String
 ) {
     val context = LocalContext.current
+    var expanded by remember { mutableStateOf(false) }
+    val rotationState by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "rotation"
+    )
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = BgSecondary),
-        shape = RoundedCornerShape(16.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
+        colors = CardDefaults.cardColors(containerColor = White),
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(200.dp)
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
@@ -390,95 +349,190 @@ private fun ImageCard(
                     contentScale = ContentScale.Crop
                 )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
-                                startY = 100f
+                if (image.isPurged) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(SkyBlue.copy(alpha = 0.8f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = White
                             )
-                        )
-                )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "CLEANED",
+                                fontWeight = FontWeight.Bold,
+                                color = White
+                            )
+                        }
+                    }
+                }
 
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .padding(12.dp)
                 ) {
                     Text(
                         image.name,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
+                        color = White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            formatBytes(image.size),
-                            fontSize = 13.sp,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                        if (image.metadata?.hasExif == true) {
-                            Text(
-                                "• ${formatBytes(image.metadata.metadataSize)} metadata",
-                                fontSize = 13.sp,
-                                color = Accent
-                            )
-                        } else {
-                            Text(
-                                "• Clean",
-                                fontSize = 13.sp,
-                                color = Success
-                            )
-                        }
-                    }
+                    Text(
+                        formatBytes(image.size),
+                        fontSize = 12.sp,
+                        color = White.copy(alpha = 0.8f)
+                    )
                 }
             }
 
             Column(modifier = Modifier.padding(16.dp)) {
                 if (image.metadata?.hasExif != true) {
-                    AlertItem(
-                        icon = Icons.Default.CheckCircle,
-                        message = "No metadata found! This image is clean.",
-                        type = "success"
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SkyBlue.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = SkyBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            "No metadata found - Image is clean",
+                            fontWeight = FontWeight.Medium,
+                            color = SkyBlue
+                        )
+                    }
                 } else {
-                    AlertItem(
-                        icon = Icons.Default.Warning,
-                        message = "Hidden metadata detected! (${image.metadata.allTags.image.size + image.metadata.allTags.exif.size + image.metadata.allTags.gps.size} tags)",
-                        type = "danger"
-                    )
+                    val metadata = image.metadata!!
+                    val totalTags = metadata.allTags.image.size + metadata.allTags.exif.size + metadata.allTags.gps.size
 
-                    image.metadata.gps?.let { gps ->
-                        GpsBox(
-                            display = gps.display,
-                            mapUrl = gps.mapUrl
-                        )
-                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(DarkNavy.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = SkyBlue,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Column {
+                                    Text(
+                                        "$totalTags metadata tags found",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = DarkNavy
+                                    )
+                                    metadata.gps?.let {
+                                        Text(
+                                            "⚠️ GPS Location detected",
+                                            fontSize = 12.sp,
+                                            color = Color(0xFFDC2626)
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
-                    image.metadata.camera?.let { camera ->
-                        MetadataRow(
-                            icon = Icons.Default.PhoneAndroid,
-                            label = "Device",
-                            value = camera
-                        )
-                    }
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            metadata.dateTime?.let {
+                                MetadataRow(icon = Icons.Default.Schedule, label = "Date", value = it)
+                            }
+                            metadata.gps?.let {
+                                MetadataRow(icon = Icons.Default.LocationOn, label = "Location", value = it.display)
+                            }
+                            metadata.camera?.let {
+                                MetadataRow(icon = Icons.Default.PhoneAndroid, label = "Device", value = it)
+                            }
+                            metadata.software?.let {
+                                MetadataRow(icon = Icons.Default.Code, label = "Software", value = it)
+                            }
+                        }
 
-                    image.metadata.dateTime?.let { date ->
-                        MetadataRow(
-                            icon = Icons.Default.Schedule,
-                            label = "Date Taken",
-                            value = date
-                        )
-                    }
+                        TextButton(
+                            onClick = { expanded = !expanded },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                modifier = Modifier.rotate(rotationState)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (expanded) "Show Less" else "View All $totalTags Tags")
+                        }
 
-                    image.metadata.software?.let { software ->
-                        MetadataRow(
-                            icon = Icons.Default.Code,
-                            label = "Software",
-                            value = software
-                        )
+                        AnimatedVisibility(visible = expanded) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .background(DarkNavy.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (metadata.allTags.image.isNotEmpty()) {
+                                    Text(
+                                        "Image Info",
+                                        fontWeight = FontWeight.Bold,
+                                        color = DarkNavy,
+                                        fontSize = 14.sp
+                                    )
+                                    metadata.allTags.image.forEach { (key, value) ->
+                                        FullMetadataRow(key, value)
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+
+                                if (metadata.allTags.exif.isNotEmpty()) {
+                                    Text(
+                                        "EXIF Data",
+                                        fontWeight = FontWeight.Bold,
+                                        color = DarkNavy,
+                                        fontSize = 14.sp
+                                    )
+                                    metadata.allTags.exif.forEach { (key, value) ->
+                                        FullMetadataRow(key, value)
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+
+                                if (metadata.allTags.gps.isNotEmpty()) {
+                                    Text(
+                                        "GPS Data",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFDC2626),
+                                        fontSize = 14.sp
+                                    )
+                                    metadata.allTags.gps.forEach { (key, value) ->
+                                        FullMetadataRow(key, value)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -489,98 +543,27 @@ private fun ImageCard(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !image.isPurged && image.metadata?.hasExif == true,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (image.isPurged) Success else Accent,
-                        disabledContainerColor = BgTertiary
+                        containerColor = SkyBlue,
+                        disabledContainerColor = SlateGray
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Icon(
-                        if (image.isPurged) Icons.Default.Check else Icons.Default.Delete,
+                        if (image.isPurged) Icons.Default.Check else Icons.Default.CleaningServices,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(18.dp),
+                        tint = if (image.isPurged) SlateGray else DarkNavy
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(if (image.isPurged) "Purged!" else "PURGE METADATA")
+                    Text(
+                        if (image.isPurged) "Already Cleaned" else "Remove Metadata",
+                        color = if (image.isPurged) SlateGray else DarkNavy,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
     }
-}
-
-@Composable
-private fun AlertItem(
-    icon: ImageVector,
-    message: String,
-    type: String
-) {
-    val (bgColor, textColor) = when (type) {
-        "success" -> SuccessBg to Success
-        else -> DangerBg to Accent
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(bgColor, RoundedCornerShape(12.dp))
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Icon(icon, contentDescription = null, tint = textColor, modifier = Modifier.size(24.dp))
-        Text(message, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = textColor)
-    }
-
-    Spacer(modifier = Modifier.height(12.dp))
-}
-
-@Composable
-private fun GpsBox(display: String, mapUrl: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DangerBg, RoundedCornerShape(12.dp))
-            .border(1.dp, DangerBorder, RoundedCornerShape(12.dp))
-            .padding(12.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                Icons.Default.LocationOn,
-                contentDescription = null,
-                tint = Accent,
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                "GPS LOCATION FOUND",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                color = Accent
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            display,
-            fontSize = 13.sp,
-            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-            color = TextSecondary
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Text(
-            "⚠️ This reveals where the photo was taken!",
-            fontSize = 11.sp,
-            color = Accent
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-    }
-
-    Spacer(modifier = Modifier.height(12.dp))
 }
 
 @Composable
@@ -590,42 +573,43 @@ private fun MetadataRow(
     value: String
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(BgTertiary, RoundedCornerShape(12.dp))
-            .padding(12.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .background(AccentSecondary.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = AccentSecondary, modifier = Modifier.size(16.dp))
-        }
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = SkyBlue,
+            modifier = Modifier.size(18.dp)
+        )
         Column {
-            Text(label, fontSize = 11.sp, color = TextMuted)
-            Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
+            Text(label, fontSize = 11.sp, color = SlateGray)
+            Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = DarkNavy)
         }
     }
-
-    Spacer(modifier = Modifier.height(8.dp))
 }
 
 @Composable
-private fun Toast(message: String) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = BgSecondary),
-        shape = RoundedCornerShape(12.dp)
+private fun FullMetadataRow(key: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
-            message,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            key.replace("_", " "),
+            fontSize = 12.sp,
+            color = SlateGray,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            value,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
-            fontSize = 14.sp,
-            color = TextPrimary
+            color = DarkNavy,
+            modifier = Modifier.weight(1.5f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -635,106 +619,65 @@ private fun Toast(message: String) {
 private fun InfoModal(onDismiss: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = BgSecondary,
+        containerColor = White,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(24.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Brush.linearGradient(listOf(Accent, AccentSecondary))),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.CleaningServices,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                Column {
-                    Text("About MetaPurge", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                    Text("How it works & why it matters", fontSize = 12.sp, color = TextMuted)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
             Text(
-                "What is Photo Metadata?",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimary
+                "About MetaPurge",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = DarkNavy
             )
-            Spacer(modifier = Modifier.height(8.dp))
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text(
-                "Every photo contains hidden data called EXIF metadata. Your camera or phone embeds this automatically — including GPS location, device model, and when the photo was taken.",
-                fontSize = 13.sp,
-                color = TextSecondary,
+                "Every photo contains hidden EXIF metadata - including GPS location, device info, and timestamps. MetaPurge removes all of it, keeping only the pixels.",
+                fontSize = 14.sp,
+                color = SlateDark,
                 lineHeight = 20.sp
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(DangerBg, RoundedCornerShape(12.dp))
-                    .border(1.dp, DangerBorder, RoundedCornerShape(12.dp))
-                    .padding(14.dp)
+                    .background(SkyBlue.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column {
-                    Text("Why should you care?", fontWeight = FontWeight.SemiBold, color = Accent)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("• GPS coordinates can reveal your home or daily routine\n• Device info can be used to track or identify you\n• Timestamps show exactly when and where you were", fontSize = 13.sp, color = TextSecondary, lineHeight = 20.sp)
-                }
+                Icon(
+                    Icons.Default.Security,
+                    contentDescription = null,
+                    tint = SkyBlue,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    "100% Offline - Your photos never leave your device",
+                    fontWeight = FontWeight.Medium,
+                    color = SkyBlue
+                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SuccessBg, RoundedCornerShape(12.dp))
-                    .padding(14.dp)
-            ) {
-                Column {
-                    Text("Privacy guarantee", fontWeight = FontWeight.SemiBold, color = Success)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("• 100% offline — no internet needed\n• Nothing is uploaded anywhere\n• All processing happens on your device", fontSize = 13.sp, color = TextSecondary, lineHeight = 20.sp)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = BgTertiary),
-                shape = RoundedCornerShape(12.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = SkyBlue),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Got it!")
+                Text("Got it!", color = DarkNavy, fontWeight = FontWeight.SemiBold)
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                "MetaPurge v1.0.0",
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-                fontSize = 11.sp,
-                color = TextMuted
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
