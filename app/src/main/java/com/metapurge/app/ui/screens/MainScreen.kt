@@ -1,5 +1,6 @@
 package com.metapurge.app.ui.screens
 
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -96,8 +97,8 @@ fun MainScreen() {
                             ),
                             contentDescription = "MetaPurge Icon",
                             modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(8.dp)),
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp)),
                             contentScale = ContentScale.Crop
                         )
                         Text(
@@ -131,6 +132,9 @@ fun MainScreen() {
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             item {
                 AnimatedContent(
                     targetState = images.isNotEmpty(),
@@ -168,6 +172,11 @@ fun MainScreen() {
                     onPurge = { viewModel.purgeImage(image.id) },
                     formatBytes = viewModel::formatBytes
                 )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                SupportSection()
             }
 
             item {
@@ -713,6 +722,45 @@ private fun InfoModal(onDismiss: () -> Unit) {
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun SupportSection() {
+    val context = LocalContext.current
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://buymeacoffee.com/potatameister"))
+                context.startActivity(intent)
+            },
+        colors = CardDefaults.cardColors(containerColor = SkyBlue.copy(alpha = 0.1f)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                Icons.Default.Favorite,
+                contentDescription = null,
+                tint = SkyBlue,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "Support MetaPurge",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = DarkNavy
+            )
         }
     }
 }

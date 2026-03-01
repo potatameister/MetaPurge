@@ -81,6 +81,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (index == -1) return@launch
 
             val image = _images.value[index]
+            
+            if (image.metadata?.hasExif != true) {
+                showToast("No metadata to purge")
+                return@launch
+            }
+            
             val cleanedUri = metadataRepository.purgeMetadata(Uri.parse(image.uri), image.name)
 
             if (cleanedUri != null) {
@@ -94,9 +100,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 statsRepository.incrementStats(1, metadataSize, if (hasGps) 1 else 0)
-                showToast("Metadata purged!")
+                showToast("Metadata removed successfully!")
             } else {
-                showToast("Failed to purge metadata")
+                showToast("Error: Could not process image. Try again.")
             }
         }
     }

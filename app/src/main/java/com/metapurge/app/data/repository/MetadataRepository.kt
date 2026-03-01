@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import androidx.exifinterface.media.ExifInterface
 import com.metapurge.app.domain.model.AllTags
 import com.metapurge.app.domain.model.GpsData
@@ -143,17 +144,29 @@ class MetadataRepository(private val context: Context) {
     suspend fun purgeMetadata(uri: Uri, originalName: String): Uri? = withContext(Dispatchers.IO) {
         try {
             val contentResolver = context.contentResolver
-            val inputStream = contentResolver.openInputStream(uri) ?: return@withContext null
+            val inputStream = contentResolver.openInputStream(uri) ?: run {
+                Log.e("MetaPurge", "Cannot open input stream for: $uri")
+                return@withContext null
+            }
 
             val fullBytes = inputStream.readBytes()
             inputStream.close()
 
+            if (fullBytes.isEmpty()) {
+                Log.e("MetaPurge", "Empty bytes read from: $uri")
+                return@withContext null
+            }
+
             val cleanBytes = purgeMetadataBytes(fullBytes)
+            
+            if (cleanBytes.size < fullBytes.size / 2) {
+                Log.w("MetaPurge", "Clean bytes suspiciously small: ${cleanBytes.size} vs ${fullBytes.size}")
+            }
 
             val outputUri = saveCleanImage(cleanBytes, originalName)
             outputUri
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("MetaPurge", "Error purging metadata", e)
             null
         }
     }
@@ -225,7 +238,9 @@ class MetadataRepository(private val context: Context) {
 
     private suspend fun saveCleanImage(bytes: ByteArray, originalName: String): Uri? = withContext(Dispatchers.IO) {
         try {
-            val cleanName = "purged_$originalName"
+            val baseName = originalName.substringBeforeLast(".")
+            val extension = originalName.substringAfterLast(".", "jpg")
+            val cleanName = "purged_${baseName}.$extension"
 
             val contentValues = ContentValues().apply {
                 put(MediaStore.Images.Media.DISPLAY_NAME, cleanName)
@@ -238,26 +253,29 @@ class MetadataRepository(private val context: Context) {
 
             val resolver = context.contentResolver
             val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-                ?: return@withContext null
+                ?: run {
+                    Log.e("MetaPurge", "Failed to insert MediaStore entry")
+                    return@withContext null
+                }
 
             resolver.openOutputStream(uri)?.use { outputStream ->
                 outputStream.write(bytes)
+            } ?: run {
+                Log.e("MetaPurge", "Failed to open output stream")
+                resolver.delete(uri, null, null)
+                return@withContext null
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 contentValues.clear()
                 contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
                 resolver.update(uri, contentValues, null, null)
-            } else {
-                ContentValues().apply {
-                    put(MediaStore.Images.Media.DATA, 
-                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath + "/$cleanName")
-                }
             }
-
+            
+            Log.d("MetaPurge", "Saved clean image: $uri")
             uri
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("MetaPurge", "Error saving clean image", e)
             null
         }
     }
