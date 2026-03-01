@@ -161,6 +161,10 @@ class MetadataRepository(private val context: Context) {
     private fun purgeMetadataBytes(input: ByteArray): ByteArray {
         val output = mutableListOf<Byte>()
 
+        if (input.size < 2 || input[0].toInt() and 0xFF != 0xFF || input[1].toInt() and 0xFF != 0xD8) {
+            return input
+        }
+
         output.add(0xFF.toByte())
         output.add(0xD8.toByte())
 
@@ -185,11 +189,9 @@ class MetadataRepository(private val context: Context) {
                     break
                 }
 
-                if (marker == 0xD8) {
-                    i += 2
-                } else if (marker == 0xD9) {
-                    output.add(0xFF.toByte())
-                    output.add(0xD9.toByte())
+                if (marker == 0xD8 || marker == 0xD9) {
+                    output.add(input[i])
+                    output.add(input[i + 1])
                     i += 2
                 } else {
                     if (i + 3 < input.size) {
@@ -212,6 +214,10 @@ class MetadataRepository(private val context: Context) {
                 output.add(input[i])
                 i++
             }
+        }
+
+        if (output.size < 10) {
+            return input
         }
 
         return output.toByteArray()

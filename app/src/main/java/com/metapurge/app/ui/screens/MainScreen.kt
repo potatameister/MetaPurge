@@ -4,13 +4,25 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,9 +43,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
+import coil.compose.rememberImagePainter
+import com.metapurge.app.R
 import com.metapurge.app.domain.model.ImageItem
 import com.metapurge.app.ui.theme.*
 import kotlinx.coroutines.delay
@@ -75,11 +86,16 @@ fun MainScreen() {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Icon(
-                            Icons.Default.PhotoLibrary,
-                            contentDescription = null,
-                            tint = White,
-                            modifier = Modifier.size(28.dp)
+                        Image(
+                            painter = coil.compose.rememberImagePainter(
+                                data = R.drawable.ic_launcher,
+                                builder = { crossfade(true) }
+                            ),
+                            contentDescription = "MetaPurge Icon",
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
                         )
                         Text(
                             "MetaPurge",
@@ -113,7 +129,23 @@ fun MainScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                UploadZone(onClick = { launcher.launch("image/jpeg") })
+                AnimatedContent(
+                    targetState = images.isNotEmpty(),
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(300)) togetherWith
+                                fadeOut(animationSpec = tween(300))
+                    },
+                    label = "upload_zone"
+                ) { hasImages ->
+                    if (hasImages) {
+                        CompactUploadZone(
+                            count = images.size,
+                            onClick = { launcher.launch("image/jpeg") }
+                        )
+                    } else {
+                        UploadZone(onClick = { launcher.launch("image/jpeg") })
+                    }
+                }
             }
 
             if (images.isNotEmpty()) {
@@ -153,7 +185,8 @@ private fun UploadZone(onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = White),
-        shape = RoundedCornerShape(24.dp)
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(2.dp, DarkNavy.copy(alpha = 0.1f))
     ) {
         Column(
             modifier = Modifier
@@ -207,6 +240,65 @@ private fun UploadZone(onClick: () -> Unit) {
                     color = White
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CompactUploadZone(count: Int, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = DarkNavy.copy(alpha = 0.05f)),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, DarkNavy.copy(alpha = 0.1f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DarkNavy),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        tint = White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column {
+                    Text(
+                        "Select More Photos",
+                        fontWeight = FontWeight.SemiBold,
+                        color = DarkNavy,
+                        fontSize = 15.sp
+                    )
+                    Text(
+                        "$count photo${if (count > 1) "s" else ""} selected",
+                        fontSize = 12.sp,
+                        color = SlateDark
+                    )
+                }
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = SlateGray
+            )
         }
     }
 }
