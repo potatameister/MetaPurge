@@ -47,8 +47,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    @Suppress("DEPRECATION")
+    kotlinOptions {
+        jvmTarget = "17"
     }
 
     buildFeatures {
@@ -58,14 +59,6 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
-}
-
-androidComponents {
-    onVariants(selector().all()) { variant ->
-        variant.outputs.configureEach {
-            it.outputFileName.set("MetaPurge.apk")
         }
     }
 }
