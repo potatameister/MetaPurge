@@ -24,7 +24,6 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             isDebuggable = false
-            isZipAlignEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -56,11 +55,11 @@ android {
     }
 }
 
-android.applicationVariants.all {
-    val variant = this
+android.applicationVariants.all { variant ->
     variant.outputs.forEach { output ->
-        val outputFile = output.outputFileName
-        if (outputFile != null && outputFile.endsWith(".apk")) {
+        val outputFile = output.asFile.get()
+        if (outputFile.extension == "apk") {
+            val newFile = outputFile.parentFile?.resolve("MetaPurge.apk")
             output.outputFileName = "MetaPurge.apk"
         }
     }
