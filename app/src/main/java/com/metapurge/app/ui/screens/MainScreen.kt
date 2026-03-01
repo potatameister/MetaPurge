@@ -82,7 +82,7 @@ fun MainScreen() {
     }
 
     Scaffold(
-        containerColor = White,
+        containerColor = LightGray,
         topBar = {
             TopAppBar(
                 title = {
@@ -94,15 +94,15 @@ fun MainScreen() {
                             model = R.drawable.ic_launcher,
                             contentDescription = "MetaPurge Icon",
                             modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(10.dp)),
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(12.dp)),
                             contentScale = ContentScale.Crop
                         )
                         Text(
                             "MetaPurge",
                             fontWeight = FontWeight.Bold,
                             color = White,
-                            fontSize = 20.sp
+                            fontSize = 22.sp
                         )
                     }
                 },

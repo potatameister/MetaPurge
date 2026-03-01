@@ -120,11 +120,14 @@ class MetadataRepository(private val context: Context) {
 
         val knownTags = listOf(
             "Make", "Model", "Orientation", "Software", "DateTime",
-            "Artist", "Copyright", "ExposureTime", "DateTimeOriginal",
-            "DateTimeDigitized", "Flash", "FocalLength", "WhiteBalance",
-            "ExposureMode", "ColorSpace", "GPSLatitude", "GPSLatitudeRef",
-            "GPSLongitude", "GPSLongitudeRef", "GPSAltitude", "GPSAltitudeRef",
-            "GPSTimeStamp", "GPSDateStamp"
+            "Artist", "Copyright", "UserComment", "ImageDescription",
+            "ExposureTime", "DateTimeOriginal", "DateTimeDigitized", 
+            "Flash", "FocalLength", "WhiteBalance", "ExposureMode", 
+            "ColorSpace", "FNumber", "ISOSpeedRatings", "LensModel",
+            "LensMake", "ApertureValue", "ShutterSpeedValue",
+            "GPSLatitude", "GPSLatitudeRef", "GPSLongitude", "GPSLongitudeRef", 
+            "GPSAltitude", "GPSAltitudeRef", "GPSTimeStamp", "GPSDateStamp",
+            "GPSProcessingMethod"
         )
 
         knownTags.forEach { tag ->
@@ -132,7 +135,9 @@ class MetadataRepository(private val context: Context) {
                 when {
                     tag.startsWith("GPS") -> gpsTags[tag] = value
                     tag in listOf("ExposureTime", "DateTimeOriginal", "DateTimeDigitized", "Flash", 
-                                 "FocalLength", "WhiteBalance", "ExposureMode", "ColorSpace") -> exifTags[tag] = value
+                                 "FocalLength", "WhiteBalance", "ExposureMode", "ColorSpace",
+                                 "FNumber", "ISOSpeedRatings", "LensModel", "LensMake",
+                                 "ApertureValue", "ShutterSpeedValue") -> exifTags[tag] = value
                     else -> imageTags[tag] = value
                 }
             }

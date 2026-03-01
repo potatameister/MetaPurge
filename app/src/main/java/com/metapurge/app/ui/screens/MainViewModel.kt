@@ -70,7 +70,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 newImages.add(item)
             }
 
-            _images.value = newImages
+            _images.value = _images.value + newImages
             _isProcessing.value = false
         }
     }
@@ -112,26 +112,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _isProcessing.value = true
             var totalDataRemoved = 0L
             var totalGpsFound = 0
+            var filesPurgedInThisOperation = 0
 
-            for (image in _images.value) {
+            val updatedImages = _images.value.map { image ->
                 if (!image.isPurged && image.metadata?.hasExif == true) {
                     val cleanedUri = metadataRepository.purgeMetadata(Uri.parse(image.uri), image.name)
                     if (cleanedUri != null) {
                         totalDataRemoved += image.metadata.metadataSize
                         if (image.metadata.gps != null) totalGpsFound++
-
-                        _images.value = _images.value.map {
-                            if (it.id == image.id) {
-                                it.copy(isPurged = true, cleanedUri = cleanedUri.toString())
-                            } else it
-                        }
+                        filesPurgedInThisOperation++
+                        image.copy(isPurged = true, cleanedUri = cleanedUri.toString())
+                    } else {
+                        image
                     }
+                } else {
+                    image
                 }
             }
 
-            if (totalDataRemoved > 0 || totalGpsFound > 0) {
+            _images.value = updatedImages
+
+            if (filesPurgedInThisOperation > 0) {
                 statsRepository.incrementStats(
-                    _images.value.count { it.isPurged },
+                    filesPurgedInThisOperation,
                     totalDataRemoved,
                     totalGpsFound
                 )
