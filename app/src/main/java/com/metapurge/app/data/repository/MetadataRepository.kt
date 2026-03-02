@@ -177,7 +177,7 @@ class MetadataRepository(private val context: Context) {
                         if (ts !in listOf("EXIF", "XMP ", "ICCP")) {
                             bodyOut.write(type); DataOutputStream(bodyOut).writeInt(lenLE)
                             val buf = ByteArray(8192); var rem = len
-                            while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buffer.size)); bodyOut.write(buf, 0, r); rem -= r }
+                            while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buf.size)); bodyOut.write(buf, 0, r); rem -= r }
                             bodySize += 8 + len
                             if (len % 2 != 0) { bodyOut.write(0); dis.skipBytes(1); bodySize += 1 }
                         } else dis.skipBytes(len + (len % 2))
