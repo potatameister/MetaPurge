@@ -70,6 +70,18 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        dex {
+            useCompileIncrementalMetadata = false
+        }
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.packaging.resources.excludes.add("META-INF/com.android.build.gradle.app_metadata")
     }
 }
 
