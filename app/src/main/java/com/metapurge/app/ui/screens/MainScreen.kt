@@ -135,27 +135,15 @@ private fun SessionGroup(sessionImages: List<ImageItem>, viewModel: MainViewMode
             }
         }
         sessionImages.forEach { image ->
-            val dismissState = rememberSwipeToDismissBoxState(confirmValueChange = { if (it == SwipeToDismissBoxValue.EndToStart) { viewModel.removeImage(image.id); true } else false })
-            SwipeToDismissBox(
-                state = dismissState,
-                enableDismissFromStartToEnd = false,
-                backgroundContent = {
-                    val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Color.Red.copy(alpha = 0.8f) else Color.Transparent
-                    Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)).background(color).padding(horizontal = 20.dp), contentAlignment = Alignment.CenterEnd) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = White)
-                    }
-                },
-                content = { 
-                    ImageCard(
-                        image = image, 
-                        onPurge = { viewModel.purgeImage(image.id) }, 
-                        onRemove = { viewModel.removeImage(image.id) }, 
-                        onShare = { shareImage(context, image) },
-                        onSave = { viewModel.saveImageToGallery(image.id) },
-                        formatBytes = viewModel::formatBytes
-                    ) 
-                }
-            )
+            // FIX: Removed SwipeToDismissBox per user request for simpler UI
+            ImageCard(
+                image = image, 
+                onPurge = { viewModel.purgeImage(image.id) }, 
+                onRemove = { viewModel.removeImage(image.id) }, 
+                onShare = { shareImage(context, image) },
+                onSave = { viewModel.saveImageToGallery(image.id) },
+                formatBytes = viewModel::formatBytes
+            ) 
         }
     }
 }
@@ -229,6 +217,7 @@ private fun ImageCard(
 @Composable
 private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Show main tags
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             metadata.allTags.image.forEach { (k, v) ->
                 FullMetadataRow(k, v)

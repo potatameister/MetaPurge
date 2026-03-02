@@ -7,8 +7,8 @@
     <group 
         android:pivotX="128"
         android:pivotY="128"
-        android:scaleX="0.65"
-        android:scaleY="0.65">
+        android:scaleX="0.55"
+        android:scaleY="0.55">
         
         <!-- BACK LAYER: Extracted Metadata & Location (Sky Blue) -->
         <path

@@ -291,7 +291,7 @@ class MetadataRepository(private val context: Context) {
             ExifInterface.TAG_GPS_DEST_BEARING_REF, ExifInterface.TAG_GPS_DEST_BEARING,
             ExifInterface.TAG_GPS_DEST_DISTANCE_REF, ExifInterface.TAG_GPS_DEST_DISTANCE,
             ExifInterface.TAG_GPS_PROCESSING_METHOD, ExifInterface.TAG_GPS_AREA_INFORMATION,
-            ExifInterface.TAG_GPS_DATESTAMP, ExifInterface.TAG_GPS_DIFFERENTIAL
+            ExifInterface.TAG_GPS_DATE_STAMP, ExifInterface.TAG_GPS_DIFFERENTIAL
         )
 
         eighteenTags.forEach { tag ->
