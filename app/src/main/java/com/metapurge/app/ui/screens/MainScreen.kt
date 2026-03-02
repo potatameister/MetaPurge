@@ -332,6 +332,7 @@ private fun HowItWorks() {
     }
 }
 
+@Composable
 private fun CompactUploadZone(count: Int, onClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, LightGray)) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
