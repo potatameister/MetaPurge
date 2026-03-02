@@ -5,23 +5,14 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -30,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -38,8 +30,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.ui.graphics.Brush
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -60,12 +50,12 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
         factory = MainViewModel.Factory(context, metadataRepository, statsRepository)
     )
     
-    // Process shared images
     LaunchedEffect(initialUris) {
         if (initialUris.isNotEmpty()) {
             viewModel.processUris(initialUris)
         }
     }
+
     val images by viewModel.images.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
     val toast by viewModel.toast.collectAsState()
@@ -197,7 +187,6 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
                                 .padding(12.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Session Header with Batch Save
                             val purgedCount = sessionImages.count { it.isPurged }
                             if (purgedCount > 0) {
                                 Row(
@@ -215,7 +204,7 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
                                         shape = RoundedCornerShape(12.dp),
                                         colors = ButtonDefaults.textButtonColors(contentColor = DarkNavy)
                                     ) {
-                                        Icon(Icons.Default.SaveAlt, contentDescription = null, size = 16.dp)
+                                        Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(4.dp))
                                         Text("Save $purgedCount to Gallery", style = MaterialTheme.typography.labelSmall)
                                     }
@@ -279,31 +268,12 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
                     Spacer(modifier = Modifier.height(80.dp))
                 }
             }
+        }
 
-            if (showInfoModal) {
-                InfoModal(onDismiss = { showInfoModal = false })
-            }
+        if (showInfoModal) {
+            InfoModal(onDismiss = { showInfoModal = false })
         }
     }
-}
-
-private fun shareImage(context: android.content.Context, image: ImageItem) {
-    val uriString = image.cleanedUri ?: image.uri
-    val uri = Uri.parse(uriString)
-    val lowerUri = uriString.lowercase()
-    val mimeType = when {
-        lowerUri.endsWith(".png") -> "image/png"
-        lowerUri.endsWith(".webp") -> "image/webp"
-        lowerUri.endsWith(".gif") -> "image/gif"
-        else -> "image/jpeg"
-    }
-    
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = mimeType
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    context.startActivity(Intent.createChooser(intent, "Share Cleaned Photo"))
 }
 
 @Composable
@@ -311,63 +281,34 @@ private fun UploadZone(onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() },
+            .height(200.dp)
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = White),
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(2.dp, DarkNavy.copy(alpha = 0.1f))
+        border = BorderStroke(2.dp, Brush.linearGradient(listOf(SkyBlue, DarkNavyLight)))
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp),
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(DarkNavy),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.AddPhotoAlternate,
-                    contentDescription = null,
-                    modifier = Modifier.size(36.dp),
-                    tint = White
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
+            Icon(
+                Icons.Default.AddPhotoAlternate,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = DarkNavy
+            )
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
-                "Select Photos",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
+                "Select Photos to Purge",
+                fontWeight = FontWeight.Bold,
                 color = DarkNavy
             )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier
-                    .background(DarkNavy, RoundedCornerShape(20.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    Icons.Default.Security,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = White
-                )
-                Text(
-                    "100% Offline",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = White
-                )
-            }
+            Text(
+                "JPEGs, PNGs, WebPs supported",
+                fontSize = 12.sp,
+                color = SlateGray
+            )
         }
     }
 }
@@ -377,11 +318,10 @@ private fun CompactUploadZone(count: Int, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize()
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = DarkNavy.copy(alpha = 0.05f)),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, DarkNavy.copy(alpha = 0.1f))
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = White),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, LightGray)
     ) {
         Row(
             modifier = Modifier
@@ -390,43 +330,12 @@ private fun CompactUploadZone(count: Int, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(DarkNavy),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = null,
-                        tint = White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        "Select More Photos",
-                        fontWeight = FontWeight.SemiBold,
-                        color = DarkNavy,
-                        fontSize = 15.sp
-                    )
-                    Text(
-                        "$count photo${if (count > 1) "s" else ""} selected",
-                        fontSize = 12.sp,
-                        color = SlateDark
-                    )
-                }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = DarkNavy)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("$count Photos Selected", fontWeight = FontWeight.SemiBold, color = DarkNavy)
             }
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = SlateGray
-            )
+            Icon(Icons.Default.Add, contentDescription = "Add More", tint = SkyBlue)
         }
     }
 }
@@ -514,7 +423,6 @@ private fun ImageCard(
                     contentScale = ContentScale.Crop
                 )
 
-                // Individual Clear (X) Button
                 IconButton(
                     onClick = onRemove,
                     modifier = Modifier
@@ -527,261 +435,91 @@ private fun ImageCard(
                         Icons.Default.Close,
                         contentDescription = "Remove",
                         tint = White,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
 
                 if (image.isPurged) {
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(DarkNavy.copy(alpha = 0.9f)),
-                        contentAlignment = Alignment.Center
+                            .align(Alignment.BottomStart)
+                            .padding(12.dp)
+                            .background(SkyBlue, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = White
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                "CLEANED",
-                                fontWeight = FontWeight.Bold,
-                                color = White
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = White, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("PURGED", color = White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-                }
-
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .padding(12.dp)
-                ) {
-                    Text(
-                        image.name,
-                        fontWeight = FontWeight.SemiBold,
-                        color = White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        formatBytes(image.size),
-                        fontSize = 12.sp,
-                        color = White.copy(alpha = 0.8f)
-                    )
                 }
             }
 
             Column(modifier = Modifier.padding(16.dp)) {
-                if (image.metadata?.hasExif != true) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(DarkNavy, RoundedCornerShape(12.dp))
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = White,
-                            modifier = Modifier.size(20.dp)
-                        )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "No metadata - Image is clean",
-                            fontWeight = FontWeight.Medium,
-                            color = White
+                            image.name,
+                            fontWeight = FontWeight.Bold,
+                            color = DarkNavy,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        val metaSize = image.metadata?.metadataSize ?: 0L
+                        Text(
+                            if (metaSize > 0) "${formatBytes(metaSize)} metadata found" else "No metadata detected",
+                            fontSize = 12.sp,
+                            color = if (metaSize > 0) Color(0xFFE53935) else SlateGray
                         )
                     }
-                } else {
-                    val metadata = image.metadata!!
-                    val totalTags = (metadata.allTags.image.size + metadata.allTags.exif.size + metadata.allTags.gps.size)
 
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(DarkNavy.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                    if (!image.isPurged && (image.metadata?.hasExif == true)) {
+                        Button(
+                            onClick = onPurge,
+                            colors = ButtonDefaults.buttonColors(containerColor = DarkNavy),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = DarkNavy,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Column {
-                                    Text(
-                                        "$totalTags metadata tags",
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = DarkNavy
-                                    )
-                                    metadata.gps?.let {
-                                        Text(
-                                            "GPS detected",
-                                            fontSize = 12.sp,
-                                            color = Color(0xFFDC2626)
-                                        )
-                                    }
-                                }
-                            }
+                            Text("Purge", fontSize = 12.sp)
                         }
-
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            metadata.dateTime?.let {
-                                MetadataRow(icon = Icons.Default.Schedule, label = "Date", value = it)
-                            }
-                            metadata.gps?.let {
-                                MetadataRow(icon = Icons.Default.LocationOn, label = "Location", value = it.display)
-                            }
-                            metadata.camera?.let {
-                                MetadataRow(icon = Icons.Default.PhoneAndroid, label = "Device", value = it)
-                            }
-                        }
-
-                        TextButton(
-                            onClick = { expanded = !expanded },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                Icons.Default.ExpandMore,
-                                contentDescription = null,
-                                modifier = Modifier.rotate(rotationState),
-                                tint = DarkNavy
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                if (expanded) "Show Less" else "View All $totalTags Tags",
-                                color = DarkNavy
-                            )
-                        }
-
-                        AnimatedVisibility(visible = expanded) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(DarkNavy.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
-                                    .padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                if (metadata.allTags.image.isNotEmpty()) {
-                                    Text(
-                                        "Image Info",
-                                        fontWeight = FontWeight.Bold,
-                                        color = DarkNavy,
-                                        fontSize = 14.sp
-                                    )
-                                    metadata.allTags.image.forEach { (key, value) ->
-                                        FullMetadataRow(key, value)
-                                    }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                }
-
-                                if (metadata.allTags.exif.isNotEmpty()) {
-                                    Text(
-                                        "EXIF Data",
-                                        fontWeight = FontWeight.Bold,
-                                        color = DarkNavy,
-                                        fontSize = 14.sp
-                                    )
-                                    metadata.allTags.exif.forEach { (key, value) ->
-                                        FullMetadataRow(key, value)
-                                    }
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                }
-
-                                if (metadata.allTags.gps.isNotEmpty()) {
-                                    Text(
-                                        "GPS Data",
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFDC2626),
-                                        fontSize = 14.sp
-                                    )
-                                    metadata.allTags.gps.forEach { (key, value) ->
-                                        FullMetadataRow(key, value)
-                                    }
-                                }
-
-                                if (metadata.allTags.technical.isNotEmpty()) {
-                                    var showTechnical by remember { mutableStateOf(false) }
-                                    
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 8.dp)
-                                    ) {
-                                        TextButton(
-                                            onClick = { showTechnical = !showTechnical },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(
-                                                if (showTechnical) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp),
-                                                tint = SlateDark
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                if (showTechnical) "Hide Technical Data" else "View ${metadata.allTags.technical.size} Technical Tags",
-                                                color = SlateDark,
-                                                fontSize = 12.sp
-                                            )
-                                        }
-
-                                        AnimatedVisibility(visible = showTechnical) {
-                                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                metadata.allTags.technical.forEach { (key, value) ->
-                                                    FullMetadataRow(key, value)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                    } else if (image.isPurged) {
+                        IconButton(onClick = onShare) {
+                            Icon(Icons.Default.Share, contentDescription = "Share", tint = DarkNavy)
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = if (image.isPurged) onShare else onPurge,
-                        modifier = Modifier.weight(1f),
-                        enabled = (image.isPurged) || (!image.isPurged && image.metadata?.hasExif == true),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (image.isPurged) SkyBlueDark else DarkNavy,
-                            disabledContainerColor = SlateGray
-                        ),
-                        shape = RoundedCornerShape(16.dp)
+                if (image.metadata != null && image.metadata.hasExif) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = LightGray.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { expanded = !expanded },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        Text("Metadata Details", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = SlateGray)
                         Icon(
-                            if (image.isPurged) Icons.Default.Share else Icons.Default.CleaningServices,
+                            Icons.Default.ExpandMore,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = White
+                            modifier = Modifier
+                                .size(20.dp)
+                                .rotate(rotationState),
+                            tint = SlateGray
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            if (image.isPurged) "Share Clean Photo" else "Remove Metadata",
-                            color = White,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                    }
+
+                    if (expanded) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        MetadataGrid(image.metadata)
                     }
                 }
             }
@@ -790,20 +528,69 @@ private fun ImageCard(
 }
 
 @Composable
-private fun MetadataRow(icon: ImageVector, label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = DarkNavy,
-            modifier = Modifier.size(18.dp)
-        )
+private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        metadata.gps?.let {
+            MetadataItem(Icons.Default.LocationOn, "Location", it.display)
+        }
+        metadata.camera?.let {
+            MetadataItem(Icons.Default.PhotoCamera, "Device", it)
+        }
+        metadata.dateTime?.let {
+            MetadataItem(Icons.Default.Event, "Taken on", it)
+        }
+        metadata.software?.let {
+            MetadataItem(Icons.Default.Code, "Software", it)
+        }
+
+        // Expert Mode
+        var expertMode by remember { mutableStateOf(false) }
+        val expertRotation by animateFloatAsState(if (expertMode) 180f else 0f, label = "")
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(LightGray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                .padding(8.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expertMode = !expertMode }
+                    .padding(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Settings, contentDescription = null, size = 14.dp, tint = SlateDark)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Expert Mode", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SlateDark)
+                }
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.rotate(expertRotation), tint = SlateDark)
+            }
+
+            if (expertMode) {
+                Spacer(Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    metadata.allTags.technical.forEach { (k, v) ->
+                        FullMetadataRow(k, v)
+                    }
+                    metadata.allTags.exif.forEach { (k, v) ->
+                        FullMetadataRow(k, v)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetadataItem(icon: ImageVector, label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = SkyBlue)
+        Spacer(modifier = Modifier.width(8.dp))
         Column {
-            Text(label, fontSize = 11.sp, color = SlateDark)
+            Text(label, fontSize = 10.sp, color = SlateGray)
             Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = DarkNavy)
         }
     }
@@ -947,7 +734,6 @@ private fun HowItWorks() {
             .padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // What is Metadata
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = White),
@@ -968,7 +754,6 @@ private fun HowItWorks() {
             }
         }
 
-        // How MetaPurge Works
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = DarkNavy),
@@ -989,3 +774,24 @@ private fun HowItWorks() {
         }
     }
 }
+
+private fun shareImage(context: android.content.Context, image: ImageItem) {
+    val uriString = image.cleanedUri ?: image.uri
+    val uri = Uri.parse(uriString)
+    val lowerUri = uriString.lowercase()
+    val mimeType = when {
+        lowerUri.endsWith(".png") -> "image/png"
+        lowerUri.endsWith(".webp") -> "image/webp"
+        lowerUri.endsWith(".gif") -> "image/gif"
+        else -> "image/jpeg"
+    }
+    
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = mimeType
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share Cleaned Photo"))
+}
+
+private fun Modifier.size(size: Int): Modifier = this.size(size.dp)

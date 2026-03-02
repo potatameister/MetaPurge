@@ -99,14 +99,18 @@ class MainViewModel(
     fun clearAll() { _images.value = emptyList() }
     fun dismissToast() { _toast.value = null }
 
+    fun formatBytes(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val units = listOf("B", "KB", "MB", "GB", "TB")
+        val digitGroup = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
+        return "%.1f %s".format(bytes / Math.pow(1024.0, digitGroup.toDouble()), units[digitGroup])
+    }
+
     private fun getFileName(uri: Uri): String? {
         var res: String? = null
         if (uri.scheme == "content") {
             context.contentResolver.query(uri, null, null, null, null)?.use {
-                if (it.moveToFirst()) {
-                    val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (index != -1) res = it.getString(index)
-                }
+                if (it.moveToFirst()) res = it.getString(it.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
             }
         }
         return res ?: uri.path?.substringAfterLast('/')
