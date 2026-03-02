@@ -322,9 +322,10 @@ private fun SupportersModal(onDismiss: () -> Unit) {
             Text("Project Supporters", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
             Spacer(modifier = Modifier.height(12.dp))
             
+            // Reordered: Plantbased4Future on top
             val supporters = listOf(
-                "Kalyan" to "Me-Kalyan",
-                "For the Planet!" to "Plantbased4Future"
+                "For the Planet!" to "Plantbased4Future",
+                "Kalyan" to "Me-Kalyan"
             )
             
             supporters.forEach { (nick, user) ->
@@ -347,7 +348,7 @@ private fun SupportersModal(onDismiss: () -> Unit) {
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            Text("Libraries Used", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
+            Text("Opensource library used", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
             Spacer(modifier = Modifier.height(12.dp))
             val libs = listOf("Jetpack Compose", "AndroidX", "Coil (Image Loading)", "Kotlin Coroutines", "ExifInterface", "DataStore")
             libs.forEach { lib ->
@@ -492,7 +493,6 @@ private fun shareImage(context: android.content.Context, image: ImageItem) {
     val mimeType = when {
         lowerUri.endsWith(".png") -> "image/png"
         lowerUri.endsWith(".webp") -> "image/webp"
-        lowerUri.endsWith(".gif") -> "image/gif"
         else -> "image/jpeg"
     }
     
