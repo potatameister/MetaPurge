@@ -407,7 +407,7 @@ private fun CompactUploadZone(count: Int, onClick: () -> Unit) {
 @Composable
 private fun UploadZone(onClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth().height(200.dp).clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = White), shape = RoundedCornerShape(24.dp), border = BorderStroke(2.dp, Brush.linearGradient(listOf(SkyBlue, DarkNavyLight)))) {
-        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(48.dp), tint = DarkNavy)
             Spacer(modifier = Modifier.height(12.dp)); Text("Select Photos to Purge", fontWeight = FontWeight.Bold, color = DarkNavy); Text("JPEGs, PNGs, WebPs supported", fontSize = 12.sp, color = SlateGray)
         }
