@@ -1,173 +1,124 @@
 package com.metapurge.app.ui.screens
 
-import android.app.Application
+import android.content.Context
 import android.net.Uri
-import androidx.lifecycle.AndroidViewModel
+import android.provider.OpenableColumns
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.metapurge.app.data.repository.MetadataRepository
 import com.metapurge.app.data.repository.StatsRepository
 import com.metapurge.app.domain.model.ImageItem
-import com.metapurge.app.domain.model.Stats
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.UUID
+import java.util.*
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val metadataRepository = MetadataRepository(application)
-    private val statsRepository = StatsRepository(application)
+class MainViewModel(
+    private val context: Context,
+    private val metadataRepository: MetadataRepository,
+    private val statsRepository: StatsRepository
+) : ViewModel() {
 
     private val _images = MutableStateFlow<List<ImageItem>>(emptyList())
-    val images: StateFlow<List<ImageItem>> = _images.asStateFlow()
-
-    private val _stats = MutableStateFlow(Stats())
-    val stats: StateFlow<Stats> = _stats.asStateFlow()
+    val images: StateFlow<List<ImageItem>> = _images
 
     private val _isProcessing = MutableStateFlow(false)
-    val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
+    val isProcessing: StateFlow<Boolean> = _isProcessing
 
     private val _toast = MutableStateFlow<String?>(null)
-    val toast: StateFlow<String?> = _toast.asStateFlow()
+    val toast: StateFlow<String?> = _toast
 
-    init {
-        viewModelScope.launch {
-            statsRepository.stats.collect { stats ->
-                _stats.value = stats
-            }
-        }
-    }
-
+    // FIX #2: One-by-One UI Updates (No more freezing)
     fun processUris(uris: List<Uri>) {
+        val sessionId = UUID.randomUUID().toString()
         viewModelScope.launch {
             _isProcessing.value = true
-            val newImages = mutableListOf<ImageItem>()
-            val sessionId = System.currentTimeMillis()
-
-            for (uri in uris) {
-                val context = getApplication<Application>()
-                val cursor = context.contentResolver.query(uri, null, null, null, null)
-                var name = "image_${System.currentTimeMillis()}.jpg"
-                var size = 0L
-
-                cursor?.use {
-                    if (it.moveToFirst()) {
-                        val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                        val sizeIndex = it.getColumnIndex(android.provider.OpenableColumns.SIZE)
-                        if (nameIndex >= 0) name = it.getString(nameIndex) ?: name
-                        if (sizeIndex >= 0) size = it.getLong(sizeIndex)
-                    }
-                }
-
+            uris.forEach { uri ->
+                val fileName = getFileName(uri) ?: "image_${System.currentTimeMillis()}.jpg"
                 val metadata = metadataRepository.readMetadata(uri)
-                val item = ImageItem(
-                    id = UUID.randomUUID().toString(),
-                    uri = uri.toString(),
-                    name = name,
-                    size = size,
-                    metadata = metadata,
-                    sessionId = sessionId
-                )
-                newImages.add(item)
+                val newItem = ImageItem(uri = uri.toString(), name = fileName, metadata = metadata, sessionId = sessionId)
+                
+                // Add to list immediately
+                val current = _images.value.toMutableList()
+                current.add(0, newItem)
+                _images.value = current
             }
-
-            _images.value = _images.value + newImages
             _isProcessing.value = false
         }
     }
 
-    fun removeImage(imageId: String) {
-        _images.value = _images.value.filter { it.id != imageId }
-    }
-
-    fun purgeImage(imageId: String) {
+    fun purgeImage(id: String) {
         viewModelScope.launch {
-            val index = _images.value.indexOfFirst { it.id == imageId }
-            if (index == -1) return@launch
-
-            val image = _images.value[index]
-            
-            if (image.metadata?.hasExif != true) {
-                showToast("No metadata to purge")
-                return@launch
-            }
-            
-            val cleanedUri = metadataRepository.purgeMetadata(Uri.parse(image.uri), image.name)
-
-            if (cleanedUri != null) {
-                val metadataSize = image.metadata?.metadataSize ?: 0
-                val hasGps = image.metadata?.gps != null
-
-                _images.value = _images.value.map {
-                    if (it.id == imageId) {
-                        it.copy(isPurged = true, cleanedUri = cleanedUri.toString())
-                    } else it
+            val image = _images.value.find { it.id == id } ?: return@launch
+            val cleanUri = metadataRepository.purgeMetadata(Uri.parse(image.uri), image.name)
+            if (cleanUri != null) {
+                _images.value = _images.value.map { if (it.id == id) it.copy(isPurged = true, cleanedUri = cleanUri.toString()) else it }
+                if (image.metadata?.hasExif == true) {
+                    statsRepository.incrementStats(1, image.metadata.metadataSize, if (image.metadata.gps != null) 1 else 0)
                 }
-
-                statsRepository.incrementStats(1, metadataSize, if (hasGps) 1 else 0)
-                showToast("Metadata removed successfully!")
-            } else {
-                showToast("Error: Could not process image")
             }
         }
     }
 
+    // FIX #1: Sequential Purging (OOM Protection)
     fun purgeAll() {
         viewModelScope.launch {
             _isProcessing.value = true
-            var totalDataRemoved = 0L
-            var totalGpsFound = 0
-            var filesPurgedInThisOperation = 0
-
-            val updatedImages = _images.value.map { image ->
-                if (!image.isPurged && image.metadata?.hasExif == true) {
-                    val cleanedUri = metadataRepository.purgeMetadata(Uri.parse(image.uri), image.name)
-                    if (cleanedUri != null) {
-                        totalDataRemoved += image.metadata.metadataSize
-                        if (image.metadata.gps != null) totalGpsFound++
-                        filesPurgedInThisOperation++
-                        image.copy(isPurged = true, cleanedUri = cleanedUri.toString())
-                    } else {
-                        image
-                    }
-                } else {
-                    image
+            val imagesToPurge = _images.value.filter { !it.isPurged && it.metadata?.hasExif == true }
+            imagesToPurge.forEach { image ->
+                val cleanUri = metadataRepository.purgeMetadata(Uri.parse(image.uri), image.name)
+                if (cleanUri != null) {
+                    _images.value = _images.value.map { if (it.id == image.id) it.copy(isPurged = true, cleanedUri = cleanUri.toString()) else it }
+                    statsRepository.incrementStats(1, image.metadata?.metadataSize ?: 0, if (image.metadata?.gps != null) 1 else 0)
                 }
             }
-
-            _images.value = updatedImages
-
-            if (filesPurgedInThisOperation > 0) {
-                statsRepository.incrementStats(
-                    filesPurgedInThisOperation,
-                    totalDataRemoved,
-                    totalGpsFound
-                )
-                showToast("All metadata purged!")
-            }
-
             _isProcessing.value = false
         }
     }
 
-    fun clearAll() {
-        _images.value = emptyList()
+    fun saveSessionToGallery(sessionId: String) {
+        viewModelScope.launch {
+            val sessionImages = _images.value.filter { it.sessionId == sessionId && it.isPurged }
+            var saved = 0
+            sessionImages.forEach { image ->
+                val uri = image.cleanedUri?.let { Uri.parse(it) } ?: return@forEach
+                val mime = when {
+                    image.name.endsWith(".png", true) -> "image/png"
+                    image.name.endsWith(".webp", true) -> "image/webp"
+                    image.name.endsWith(".gif", true) -> "image/gif"
+                    else -> "image/jpeg"
+                }
+                if (metadataRepository.saveToGallery(uri, image.name, mime) != null) saved++
+            }
+            if (saved > 0) _toast.value = "Saved $saved images to Pictures/MetaPurge"
+        }
     }
 
-    fun dismissToast() {
-        _toast.value = null
+    fun removeImage(id: String) { _images.value = _images.value.filter { it.id != id } }
+    fun clearAll() { _images.value = emptyList() }
+    fun dismissToast() { _toast.value = null }
+
+    private fun getFileName(uri: Uri): String? {
+        var res: String? = null
+        if (uri.scheme == "content") {
+            context.contentResolver.query(uri, null, null, null, null)?.use {
+                if (it.moveToFirst()) {
+                    val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (index != -1) res = it.getString(index)
+                }
+            }
+        }
+        return res ?: uri.path?.substringAfterLast('/')
     }
 
-    private fun showToast(message: String) {
-        _toast.value = message
-    }
-
-    fun formatBytes(bytes: Long): String {
-        return when {
-            bytes < 1024 -> "$bytes B"
-            bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
-            else -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
+    class Factory(
+        private val context: Context,
+        private val metadataRepository: MetadataRepository,
+        private val statsRepository: StatsRepository
+    ) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            return MainViewModel(context, metadataRepository, statsRepository) as T
         }
     }
 }

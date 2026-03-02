@@ -1,12 +1,14 @@
 package com.metapurge.app.data.repository
 
-import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.util.Log
 import androidx.exifinterface.media.ExifInterface
 import com.metapurge.app.domain.model.AllTags
@@ -14,401 +16,316 @@ import com.metapurge.app.domain.model.GpsData
 import com.metapurge.app.domain.model.ImageMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.io.InputStream
-import java.io.OutputStream
+import java.io.*
 
 class MetadataRepository(private val context: Context) {
 
     suspend fun readMetadata(uri: Uri): ImageMetadata? = withContext(Dispatchers.IO) {
         try {
-            val contentResolver = context.contentResolver
-            val inputStream = contentResolver.openInputStream(uri) ?: return@withContext null
-
-            val fullBytes = inputStream.readBytes()
-            val metadataSize = calculateMetadataSize(fullBytes)
-            val hasExif = metadataSize > 0
-
-            inputStream.close()
-
-            val freshStream = contentResolver.openInputStream(uri) ?: return@withContext null
+            val metadataSize = calculateMetadataSizeStreaming(uri)
+            val freshStream = context.contentResolver.openInputStream(uri) ?: return@withContext null
             val exif = ExifInterface(freshStream)
             freshStream.close()
 
-            val gps = extractGps(exif)
-            val camera = extractCamera(exif)
-            val dateTime = extractDateTime(exif)
-            val software = extractSoftware(exif)
-            val allTags = extractAllTags(exif)
-
             ImageMetadata(
-                hasExif = hasExif,
+                hasExif = metadataSize > 0,
                 metadataSize = metadataSize,
-                gps = gps,
-                camera = camera,
-                dateTime = dateTime,
-                software = software,
-                allTags = allTags
+                gps = extractGps(exif),
+                camera = extractCamera(exif),
+                dateTime = extractDateTime(exif),
+                software = extractSoftware(exif),
+                allTags = extractAllTags(exif)
             )
         } catch (e: Exception) {
-            Log.e("MetaPurge", "Error reading metadata with ExifInterface", e)
+            Log.e("MetaPurge", "Error reading metadata", e)
             null
         }
     }
 
-    private fun calculateMetadataSize(bytes: ByteArray): Long {
-        return when {
-            isPng(bytes) -> calculatePngMetadataSize(bytes)
-            isWebp(bytes) -> calculateWebpMetadataSize(bytes)
-            isGif(bytes) -> calculateGifMetadataSize(bytes)
-            isTiff(bytes) -> calculateTiffMetadataSize(bytes)
-            else -> calculateJpegMetadataSize(bytes)
-        }
-    }
-
-    private fun calculateJpegMetadataSize(bytes: ByteArray): Long {
-        var size: Long = 0
-        var i = 0
-        while (i < bytes.size - 1) {
-            if (bytes[i].toInt() and 0xFF == 0xFF) {
-                val marker = bytes[i + 1].toInt() and 0xFF
-                if (marker >= 0xE0 && marker <= 0xEF || marker == 0xFE) {
-                    if (i + 3 < bytes.size) {
-                        val len = ((bytes[i + 2].toInt() and 0xFF) shl 8) or (bytes[i + 3].toInt() and 0xFF)
-                        size += len + 2
-                        i += 2 + len
-                    } else i++
-                } else if (marker == 0xDA) break else i += 2
-            } else i++
-        }
-        return size
-    }
-
-    private fun calculatePngMetadataSize(bytes: ByteArray): Long {
-        var size: Long = 0
-        if (bytes.size < 8) return 0
-        var i = 8
-        while (i + 8 <= bytes.size) {
-            val length = readInt(bytes, i)
-            val type = String(bytes, i + 4, 4)
-            val isEssential = when (type) {
-                "IHDR", "PLTE", "IDAT", "IEND", "tRNS", "sRGB", "gAMA", "cHRM" -> true
-                else -> false
-            }
-            if (!isEssential) size += length + 12
-            i += length + 12
-            if (type == "IEND") break
-        }
-        return size
-    }
-
-    private fun calculateWebpMetadataSize(bytes: ByteArray): Long {
-        var size: Long = 0
-        if (bytes.size < 12) return 0
-        var i = 12
-        while (i + 8 <= bytes.size) {
-            val type = String(bytes, i, 4)
-            val length = readIntLE(bytes, i + 4)
-            if (type == "EXIF" || type == "XMP " || type == "ICCP") size += length + 8
-            i += 8 + length + (length % 2)
-        }
-        return size
-    }
-
-    private fun calculateGifMetadataSize(bytes: ByteArray): Long {
-        var size: Long = 0
-        if (bytes.size < 13) return 0
-        var i = 13
-        val packed = bytes[10].toInt() and 0xFF
-        if (packed and 0x80 != 0) i += 3 * (1 shl ((packed and 0x07) + 1))
-        while (i < bytes.size) {
-            val blockType = bytes[i].toInt() and 0xFF
-            if (blockType == 0x21) {
-                val extType = bytes[i + 1].toInt() and 0xFF
-                val isMetadata = extType == 0xFE || extType == 0xFF
-                var blockSize = 2
-                var subBlockSize = bytes[i + 2].toInt() and 0xFF
-                while (subBlockSize > 0 && i + blockSize + subBlockSize < bytes.size) {
-                    blockSize += subBlockSize + 1
-                    subBlockSize = bytes[i + blockSize].toInt() and 0xFF
-                }
-                blockSize += 1
-                if (isMetadata) size += blockSize
-                i += blockSize
-            } else if (blockType == 0x2C) {
-                i += 10
-                if (bytes[i-1].toInt() and 0x80 != 0) i += 3 * (1 shl ((bytes[i-1].toInt() and 0x07) + 1))
-                i++
-                var subBlockSize = bytes[i].toInt() and 0xFF
-                while (subBlockSize > 0 && i + subBlockSize < bytes.size) { i += subBlockSize + 1; subBlockSize = bytes[i].toInt() and 0xFF }
-                i++
-            } else if (blockType == 0x3B) break else i++
-        }
-        return size
-    }
-
-    private fun calculateTiffMetadataSize(bytes: ByteArray): Long {
-        // TIFF is extremely complex, as the metadata is deeply integrated. 
-        // For calculation purposes, we consider any non-essential IFD tag as metadata.
-        // This is an estimation for display. The actual purge is thorough.
-        return 1024L // Placeholder for estimation
-    }
-
-    private fun extractGps(exif: ExifInterface): GpsData? {
-        val latLong = exif.latLong ?: return null
-        val lat = latLong[0]
-        val lon = latLong[1]
-        return GpsData(
-            latitude = lat,
-            longitude = lon,
-            display = "%.6f°%s, %.6f°%s".format(
-                kotlin.math.abs(lat), if (lat >= 0) "N" else "S",
-                kotlin.math.abs(lon), if (lon >= 0) "E" else "W"
-            ),
-            mapUrl = "https://www.google.com/maps?q=$lat,$lon"
-        )
-    }
-
-    private fun extractCamera(exif: ExifInterface): String? {
-        val make = exif.getAttribute(ExifInterface.TAG_MAKE)
-        val model = exif.getAttribute(ExifInterface.TAG_MODEL)
-        return listOfNotNull(make, model).joinToString(" ").takeIf { it.isNotBlank() }
-    }
-
-    private fun extractDateTime(exif: ExifInterface): String? {
-        return exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
-            ?: exif.getAttribute(ExifInterface.TAG_DATETIME)
-    }
-
-    private fun extractSoftware(exif: ExifInterface): String? {
-        return exif.getAttribute(ExifInterface.TAG_SOFTWARE)
-    }
-
-    private fun extractAllTags(exif: ExifInterface): AllTags {
-        val imageTags = mutableMapOf<String, String>()
-        val exifTags = mutableMapOf<String, String>()
-        val gpsTags = mutableMapOf<String, String>()
-        val technicalTags = mutableMapOf<String, String>()
-
-        val sensitiveTags = listOf(
-            "Make", "Model", "Orientation", "Software", "DateTime",
-            "Artist", "Copyright", "UserComment", "ImageDescription",
-            "ExposureTime", "DateTimeOriginal", "DateTimeDigitized", 
-            "Flash", "FocalLength", "WhiteBalance", "ExposureMode", 
-            "ColorSpace", "FNumber", "ISOSpeedRatings", "LensModel",
-            "LensMake", "ApertureValue", "ShutterSpeedValue",
-            "GPSLatitude", "GPSLatitudeRef", "GPSLongitude", "GPSLongitudeRef", 
-            "GPSAltitude", "GPSAltitudeRef", "GPSTimeStamp", "GPSDateStamp",
-            "GPSProcessingMethod"
-        )
-
-        val allPossibleTags = listOf(
-            "ImageWidth", "ImageLength", "BitsPerSample", "Compression",
-            "PhotometricInterpretation", "Orientation", "SamplesPerPixel",
-            "PlanarConfiguration", "YCbCrSubSampling", "YCbCrPositioning",
-            "XResolution", "YResolution", "ResolutionUnit", "StripOffsets",
-            "RowsPerStrip", "StripByteCounts", "JPEGInterchangeFormat",
-            "JPEGInterchangeFormatLength", "TransferFunction", "WhitePoint",
-            "PrimaryChromaticities", "YCbCrCoefficients", "ReferenceBlackWhite",
-            "DateTime", "ImageDescription", "Make", "Model", "Software",
-            "Artist", "Copyright",
-            "ExifVersion", "FlashpixVersion", "ColorSpace", "ComponentsConfiguration",
-            "CompressedBitsPerPixel", "PixelXDimension", "PixelYDimension",
-            "MakerNote", "UserComment", "RelatedSoundFile", "DateTimeOriginal",
-            "DateTimeDigitized", "SubSecTime", "SubSecTimeOriginal",
-            "SubSecTimeDigitized", "ExposureTime", "FNumber", "ExposureProgram",
-            "SpectralSensitivity", "ISOSpeedRatings", "OECF", "ShutterSpeedValue",
-            "ApertureValue", "BrightnessValue", "ExposureBiasValue",
-            "MaxApertureValue", "SubjectDistance", "MeteringMode",
-            "LightSource", "Flash", "SubjectArea", "FocalLength",
-            "FlashEnergy", "SpatialFrequencyResponse", "FocalPlaneXResolution",
-            "FocalPlaneYResolution", "FocalPlaneResolutionUnit",
-            "SubjectLocation", "ExposureIndex", "SensingMethod",
-            "FileSource", "SceneType", "CFAPattern", "CustomRendered",
-            "ExposureMode", "WhiteBalance", "DigitalZoomRatio",
-            "FocalLengthIn35mmFilm", "SceneCaptureType", "GainControl",
-            "Contrast", "Saturation", "Sharpness", "DeviceSettingDescription",
-            "SubjectDistanceRange", "ImageUniqueID", "LensSpecification",
-            "LensMake", "LensModel", "LensSerialNumber",
-            "GPSVersionID", "GPSLatitudeRef", "GPSLatitude", "GPSLongitudeRef",
-            "GPSLongitude", "GPSAltitudeRef", "GPSAltitude", "GPSTimeStamp",
-            "GPSSatellites", "GPSStatus", "GPSMeasureMode", "GPSDOP",
-            "GPSSpeedRef", "GPSSpeed", "GPSTrackRef", "GPSTrack",
-            "GPSImgDirectionRef", "GPSImgDirection", "GPSMapDatum",
-            "GPSDestLatitudeRef", "GPSDestLatitude", "GPSDestLongitudeRef",
-            "GPSDestLongitude", "GPSDestBearingRef", "GPSDestBearing",
-            "GPSDestDistanceRef", "GPSDestDistance", "GPSProcessingMethod",
-            "GPSAreaInformation", "GPSDateStamp", "GPSDifferential"
-        )
-
-        allPossibleTags.distinct().forEach { tag ->
-            exif.getAttribute(tag)?.let { value ->
+    private fun calculateMetadataSizeStreaming(uri: Uri): Long {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val bis = BufferedInputStream(input)
+                bis.mark(12)
+                val head = ByteArray(12); bis.read(head); bis.reset()
                 when {
-                    tag in sensitiveTags -> {
-                        when {
-                            tag.startsWith("GPS") -> gpsTags[tag] = value
-                            tag in listOf("ExposureTime", "DateTimeOriginal", "DateTimeDigitized", "Flash", 
-                                         "FocalLength", "WhiteBalance", "ExposureMode", "ColorSpace",
-                                         "FNumber", "ISOSpeedRatings", "LensModel", "LensMake",
-                                         "ApertureValue", "ShutterSpeedValue") -> exifTags[tag] = value
-                            else -> imageTags[tag] = value
-                        }
-                    }
-                    else -> technicalTags[tag] = value
+                    isPng(head) -> calculatePngMetadataSizeStreaming(bis)
+                    isWebp(head) -> calculateWebpMetadataSizeStreaming(bis)
+                    isGif(head) -> calculateGifMetadataSizeStreaming(uri)
+                    else -> calculateJpegMetadataSizeStreaming(bis)
                 }
-            }
-        }
-
-        return AllTags(imageTags, exifTags, gpsTags, technicalTags)
+            } ?: 0
+        } catch (e: Exception) { 0 }
     }
 
     suspend fun purgeMetadata(uri: Uri, originalName: String): Uri? = withContext(Dispatchers.IO) {
+        val tempFile = File(context.cacheDir, "purging_${System.currentTimeMillis()}")
+        var finalName = originalName
         try {
-            val contentResolver = context.contentResolver
-            val inputStream = contentResolver.openInputStream(uri) ?: return@withContext null
-            val fullBytes = inputStream.readBytes()
-            inputStream.close()
-            if (fullBytes.isEmpty()) return@withContext null
-
-            val cleanBytes = when {
-                isPng(fullBytes) -> purgePngMetadataBytes(fullBytes)
-                isWebp(fullBytes) -> purgeWebpMetadataBytes(fullBytes)
-                isGif(fullBytes) -> purgeGifMetadataBytes(fullBytes)
-                isTiff(fullBytes) -> purgeTiffMetadataBytes(fullBytes)
-                else -> purgeMetadataBytes(fullBytes)
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                val bis = BufferedInputStream(inputStream)
+                bis.mark(12)
+                val head = ByteArray(12); bis.read(head); bis.reset()
+                val needsRotation = checkOrientation(uri)
+                val isTiff = isTiff(head)
+                if (needsRotation || isTiff) {
+                    finalName = originalName.substringBeforeLast(".") + ".jpg"
+                }
+                FileOutputStream(tempFile).use { outputStream ->
+                    if (needsRotation) {
+                        fixRotationAndPurgeSafe(uri, outputStream)
+                    } else {
+                        when {
+                            isPng(head) -> purgePngStream(bis, outputStream)
+                            isWebp(head) -> purgeWebpStream(bis, outputStream)
+                            isGif(head) -> purgeGifStream(bis, outputStream)
+                            isTiff -> normalizeTiffToJpeg(uri, outputStream)
+                            else -> purgeJpegStream(bis, outputStream)
+                        }
+                    }
+                }
             }
-
-            val mimeType = when {
-                isPng(fullBytes) -> "image/png"
-                isWebp(fullBytes) -> "image/webp"
-                isGif(fullBytes) -> "image/gif"
-                isTiff(fullBytes) -> "image/tiff"
-                else -> "image/jpeg"
-            }
-            saveCleanImage(cleanBytes, originalName, mimeType)
+            val finalFile = File(context.cacheDir, "purged_${finalName}")
+            if (finalFile.exists()) finalFile.delete()
+            tempFile.renameTo(finalFile)
+            Uri.fromFile(finalFile)
         } catch (e: Exception) {
-            Log.e("MetaPurge", "Error purging metadata", e)
+            if (tempFile.exists()) tempFile.delete()
+            Log.e("MetaPurge", "Purge failed", e)
             null
         }
     }
 
-    private fun isPng(bytes: ByteArray): Boolean = bytes.size >= 8 && bytes[0].toInt() and 0xFF == 0x89 && bytes[1].toInt() and 0xFF == 0x50 && bytes[2].toInt() and 0xFF == 0x4E && bytes[3].toInt() and 0xFF == 0x47
-    private fun isWebp(bytes: ByteArray): Boolean = bytes.size >= 12 && String(bytes, 0, 4) == "RIFF" && String(bytes, 8, 4) == "WEBP"
-    private fun isGif(bytes: ByteArray): Boolean = bytes.size >= 6 && (String(bytes, 0, 6) == "GIF87a" || String(bytes, 0, 6) == "GIF89a")
-    private fun isTiff(bytes: ByteArray): Boolean = bytes.size >= 4 && ((bytes[0].toInt() == 0x49 && bytes[1].toInt() == 0x49) || (bytes[0].toInt() == 0x4D && bytes[1].toInt() == 0x4D))
-
-    private fun purgePngMetadataBytes(input: ByteArray): ByteArray {
-        val output = ByteArrayOutputStream(input.size)
-        output.write(input, 0, 8)
-        var i = 8
-        while (i + 8 <= input.size) {
-            val length = readInt(input, i)
-            val type = String(input, i + 4, 4)
-            val shouldKeep = when (type) { "IHDR", "PLTE", "IDAT", "IEND", "tRNS", "sRGB", "gAMA", "cHRM" -> true else -> false }
-            if (shouldKeep && i + length + 12 <= input.size) output.write(input, i, length + 12)
-            i += length + 12
-            if (type == "IEND") break
+    private fun fixRotationAndPurgeSafe(uri: Uri, out: OutputStream) {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+        val sampleSize = if ((options.outWidth * options.outHeight) > 20_000_000) 2 else 1
+        val bitmap = context.contentResolver.openInputStream(uri)?.use { 
+            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sampleSize }) 
+        } ?: return
+        val exif = context.contentResolver.openInputStream(uri)?.use { ExifInterface(it) }
+        val orientation = exif?.getAttributeInt(ExifInterface.TAG_ORIENTATION, 1) ?: 1
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
         }
-        return output.toByteArray()
+        val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        if (rotated != bitmap) bitmap.recycle()
+        rotated.compress(Bitmap.CompressFormat.JPEG, 90, out)
+        rotated.recycle()
     }
 
-    private fun purgeWebpMetadataBytes(input: ByteArray): ByteArray {
-        val output = ByteArrayOutputStream(input.size)
-        output.write(input, 0, 12)
-        var i = 12
-        while (i + 8 <= input.size) {
-            val type = String(input, i, 4)
-            val length = readIntLE(input, i + 4)
-            if (type != "EXIF" && type != "XMP " && type != "ICCP") {
-                if (i + 8 + length <= input.size) output.write(input, i, 8 + length + (length % 2))
+    private fun normalizeTiffToJpeg(uri: Uri, out: OutputStream) {
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            val bitmap = BitmapFactory.decodeStream(input)
+            bitmap?.compress(Bitmap.CompressFormat.JPEG, 95, out)
+            bitmap?.recycle()
+        }
+    }
+
+    private fun purgeJpegStream(input: InputStream, out: OutputStream) {
+        val dis = DataInputStream(input)
+        try {
+            if (dis.readUnsignedShort() != 0xFFD8) return
+            out.write(byteArrayOf(0xFF.toByte(), 0xD8.toByte()))
+            while (true) {
+                var b = dis.readUnsignedByte()
+                if (b != 0xFF) continue
+                var m = dis.readUnsignedByte()
+                while (m == 0xFF) m = dis.readUnsignedByte()
+                if (m == 0xDA) { out.write(0xFF); out.write(0xDA); dis.copyTo(out); break }
+                val l = dis.readUnsignedShort()
+                if (m !in 0xE0..0xEF && m != 0xFE) {
+                    out.write(0xFF); out.write(m); out.write((l shr 8) and 0xFF); out.write(l and 0xFF)
+                    val buffer = ByteArray(l - 2); dis.readFully(buffer); out.write(buffer)
+                } else dis.skipBytes(l - 2)
             }
-            i += 8 + length + (length % 2)
-        }
-        val result = output.toByteArray()
-        val finalSize = result.size - 8
-        result[4] = (finalSize and 0xFF).toByte(); result[5] = ((finalSize shr 8) and 0xFF).toByte(); result[6] = ((finalSize shr 16) and 0xFF).toByte(); result[7] = ((finalSize shr 24) and 0xFF).toByte()
-        return result
+        } catch (e: Exception) {}
     }
 
-    private fun purgeGifMetadataBytes(input: ByteArray): ByteArray {
-        val output = ByteArrayOutputStream(input.size)
-        var i = 13
-        val packed = input[10].toInt() and 0xFF
-        if (packed and 0x80 != 0) i += 3 * (1 shl ((packed and 0x07) + 1))
-        output.write(input, 0, i)
-        while (i < input.size) {
-            val blockType = input[i].toInt() and 0xFF
-            if (blockType == 0x21) {
-                val extType = input[i + 1].toInt() and 0xFF
-                val isMetadata = extType == 0xFE || extType == 0xFF
-                var blockSize = 2
-                var subBlockSize = input[i + 2].toInt() and 0xFF
-                while (subBlockSize > 0 && i + blockSize + subBlockSize < input.size) { blockSize += subBlockSize + 1; subBlockSize = input[i + blockSize].toInt() and 0xFF }
-                blockSize += 1
-                if (!isMetadata) output.write(input, i, blockSize)
-                i += blockSize
-            } else if (blockType == 0x2C) {
-                val start = i; i += 10
-                if (input[i-1].toInt() and 0x80 != 0) i += 3 * (1 shl ((input[i-1].toInt() and 0x07) + 1))
-                i++
-                var subBlockSize = input[i].toInt() and 0xFF
-                while (subBlockSize > 0 && i + subBlockSize < input.size) { i += subBlockSize + 1; subBlockSize = input[i].toInt() and 0xFF }
-                i++; output.write(input, start, i - start)
-            } else if (blockType == 0x3B) { output.write(0x3B); break } else { output.write(input[i].toInt()); i++ }
-        }
-        return output.toByteArray()
-    }
-
-    private fun purgeTiffMetadataBytes(input: ByteArray): ByteArray {
-        // For TIFF, we convert to a clean JPEG to ensure 100% metadata removal.
-        // Stripping TIFF metadata while keeping the raw data is extremely error-prone.
-        // This is a common strategy for privacy apps: if the format is complex,
-        // normalize it to a safe standard (JPEG).
+    private fun purgePngStream(input: InputStream, out: OutputStream) {
+        val head = ByteArray(8); input.read(head); out.write(head)
+        val dis = DataInputStream(input)
         try {
-            val bitmap = android.graphics.BitmapFactory.decodeByteArray(input, 0, input.size) ?: return input
-            val output = ByteArrayOutputStream()
-            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, output)
-            return output.toByteArray()
-        } catch (e: Exception) {
-            return input
-        }
+            while (true) {
+                val len = dis.readInt(); val type = ByteArray(4); dis.readFully(type)
+                val ts = String(type)
+                if (ts in listOf("IHDR", "PLTE", "IDAT", "IEND", "tRNS", "sRGB", "gAMA", "cHRM")) {
+                    val dos = DataOutputStream(out); dos.writeInt(len); dos.write(type)
+                    val buf = ByteArray(8192); var rem = len
+                    while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buf.size)); dos.write(buf, 0, r); rem -= r }
+                    dos.writeInt(dis.readInt())
+                } else dis.skipBytes(len + 4)
+                if (ts == "IEND") break
+            }
+        } catch (e: Exception) {}
     }
 
-    private fun readInt(bytes: ByteArray, offset: Int): Int = ((bytes[offset].toInt() and 0xFF) shl 24) or ((bytes[offset + 1].toInt() and 0xFF) shl 16) or ((bytes[offset + 2].toInt() and 0xFF) shl 8) or (bytes[offset + 3].toInt() and 0xFF)
-    private fun readIntLE(bytes: ByteArray, offset: Int): Int = (bytes[offset].toInt() and 0xFF) or ((bytes[offset + 1].toInt() and 0xFF) shl 8) or ((bytes[offset + 2].toInt() and 0xFF) shl 16) or ((bytes[offset + 3].toInt() and 0xFF) shl 24)
-
-    private fun purgeMetadataBytes(input: ByteArray): ByteArray {
-        if (input.size < 2 || input[0].toInt() and 0xFF != 0xFF || input[1].toInt() and 0xFF != 0xD8) return input
-        val output = ByteArrayOutputStream(input.size)
-        output.write(0xFF); output.write(0xD8)
-        var i = 2
-        while (i < input.size - 1) {
-            if (input[i].toInt() and 0xFF == 0xFF) {
-                val marker = input[i + 1].toInt() and 0xFF
-                if (marker >= 0xE0 && marker <= 0xEF || marker == 0xFE) {
-                    if (i + 3 < input.size) { i += 2 + (((input[i + 2].toInt() and 0xFF) shl 8) or (input[i + 3].toInt() and 0xFF)); continue }
-                }
-                if (marker == 0xDA) { output.write(input, i, input.size - i); break }
-                if (marker == 0xD8) i += 2 else if (marker == 0xD9) { output.write(0xFF); output.write(0xD9); i += 2 } else {
-                    if (i + 3 < input.size) { val len = ((input[i + 2].toInt() and 0xFF) shl 8) or (input[i + 3].toInt() and 0xFF); if (len > 0 && len < input.size - i - 2) { output.write(input, i, len + 2); i += len + 2 } else { output.write(0xFF); output.write(input[i + 1].toInt() and 0xFF); i += 2 } } else i++
-                }
-            } else { output.write(input[i].toInt() and 0xFF); i++ }
-        }
-        return output.toByteArray()
-    }
-
-    private suspend fun saveCleanImage(bytes: ByteArray, originalName: String, mimeType: String): Uri? = withContext(Dispatchers.IO) {
+    private fun purgeWebpStream(input: InputStream, out: OutputStream) {
+        val bodyFile = File(context.cacheDir, "webp_body_${System.currentTimeMillis()}")
         try {
-            val baseName = originalName.substringBeforeLast(".")
-            val extension = when (mimeType) { "image/png" -> "png"; "image/webp" -> "webp"; "image/gif" -> "gif"; "image/tiff" -> "jpg" /* Normalizing TIFF to JPG */; else -> "jpg" }
-            val cleanName = "purged_${baseName}.$extension"
-            val contentValues = ContentValues().apply { put(MediaStore.Images.Media.DISPLAY_NAME, cleanName); put(MediaStore.Images.Media.MIME_TYPE, if (mimeType == "image/tiff") "image/jpeg" else mimeType); if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MetaPurge"); put(MediaStore.Images.Media.IS_PENDING, 1) } }
+            val dis = DataInputStream(input); dis.skipBytes(12)
+            var bodySize = 0L
+            bodyFile.outputStream().use { bodyOut ->
+                try {
+                    while (true) {
+                        val type = ByteArray(4); dis.readFully(type)
+                        val ts = String(type); val lenLE = dis.readInt(); val len = Integer.reverseBytes(lenLE)
+                        if (ts !in listOf("EXIF", "XMP ", "ICCP")) {
+                            bodyOut.write(type); DataOutputStream(bodyOut).writeInt(lenLE)
+                            val buf = ByteArray(8192); var rem = len
+                            while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buf.size)); bodyOut.write(buf, 0, r); rem -= r }
+                            bodySize += 8 + len
+                            if (len % 2 != 0) { bodyOut.write(0); dis.skipBytes(1); bodySize += 1 }
+                        } else dis.skipBytes(len + (len % 2))
+                    }
+                } catch (e: Exception) {}
+            }
+            val dos = DataOutputStream(out)
+            dos.write("RIFF".toByteArray()); dos.writeInt(Integer.reverseBytes((bodySize + 4).toInt())); dos.write("WEBP".toByteArray())
+            bodyFile.inputStream().use { it.copyTo(out) }
+        } finally { if (bodyFile.exists()) bodyFile.delete() }
+    }
+
+    private fun purgeGifStream(input: InputStream, out: OutputStream) {
+        val dis = DataInputStream(input); val head = ByteArray(6); dis.readFully(head); out.write(head)
+        val lsd = ByteArray(7); dis.readFully(lsd); out.write(lsd)
+        if (lsd[4].toInt() and 0x80 != 0) {
+            val size = 3 * (1 shl ((lsd[4].toInt() and 0x07) + 1)); val gct = ByteArray(size); dis.readFully(gct); out.write(gct)
+        }
+        try {
+            while (true) {
+                val bt = dis.readUnsignedByte()
+                if (bt == 0x21) {
+                    val et = dis.readUnsignedByte(); var isMeta = et == 0xFE || et == 0xFF
+                    val blocks = mutableListOf<ByteArray>()
+                    while (true) { val sl = dis.readUnsignedByte(); val sub = ByteArray(sl + 1); sub[0] = sl.toByte(); if (sl > 0) dis.readFully(sub, 1, sl); blocks.add(sub); if (sl == 0) break }
+                    if (et == 0xFF && blocks.isNotEmpty() && String(blocks[0], 1, minOf(8, blocks[0].size - 1)) == "NETSCAPE") isMeta = false
+                    if (!isMeta) { out.write(0x21); out.write(et); blocks.forEach { out.write(it) } }
+                } else if (bt == 0x2C) {
+                    out.write(0x2C); val id = ByteArray(9); dis.readFully(id); out.write(id)
+                    if (id[8].toInt() and 0x80 != 0) {
+                        val size = 3 * (1 shl ((id[8].toInt() and 0x07) + 1)); val lct = ByteArray(size); dis.readFully(lct); out.write(lct)
+                    }
+                    out.write(dis.readUnsignedByte())
+                    while (true) { val sl = dis.readUnsignedByte(); out.write(sl); if (sl == 0) break; val sub = ByteArray(sl); dis.readFully(sub); out.write(sub) }
+                } else if (bt == 0x3B) { out.write(0x3B); break } else break
+            }
+        } catch (e: Exception) {}
+    }
+
+    private fun calculateJpegMetadataSizeStreaming(input: InputStream): Long {
+        var size = 0L; val dis = DataInputStream(input)
+        try {
+            if (dis.readUnsignedShort() != 0xFFD8) return 0
+            while (true) {
+                var b = dis.readUnsignedByte()
+                if (b != 0xFF) continue
+                var m = dis.readUnsignedByte()
+                while (m == 0xFF) m = dis.readUnsignedByte()
+                if (m == 0xDA) break
+                val l = dis.readUnsignedShort()
+                if (m in 0xE0..0xEF || m == 0xFE) size += l + 2
+                dis.skipBytes(l - 2)
+            }
+        } catch (e: Exception) {}
+        return size
+    }
+
+    private fun calculatePngMetadataSizeStreaming(input: InputStream): Long {
+        var size = 0L; input.skip(8); val dis = DataInputStream(input)
+        try {
+            while (true) {
+                val l = dis.readInt(); val t = ByteArray(4); dis.readFully(t); val ts = String(t)
+                if (ts !in listOf("IHDR", "PLTE", "IDAT", "IEND", "tRNS", "sRGB", "gAMA", "cHRM")) size += l + 12
+                dis.skipBytes(l + 4); if (ts == "IEND") break
+            }
+        } catch (e: Exception) {}
+        return size
+    }
+
+    private fun calculateWebpMetadataSizeStreaming(input: InputStream): Long {
+        var size = 0L; input.skip(12); val dis = DataInputStream(input)
+        try {
+            while (true) {
+                val t = ByteArray(4); dis.readFully(t); val ts = String(t)
+                val l = Integer.reverseBytes(dis.readInt())
+                if (ts in listOf("EXIF", "XMP ", "ICCP")) size += l + 8
+                dis.skipBytes(l + (l % 2))
+            }
+        } catch (e: Exception) {}
+        return size
+    }
+
+    private fun calculateGifMetadataSizeStreaming(uri: Uri): Long {
+        var size = 0L
+        try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val dis = DataInputStream(input); dis.skipBytes(13)
+                // Skip Global Color Table if present
+                val headBuffer = ByteArray(13); context.contentResolver.openInputStream(uri)?.use { it.read(headBuffer) }
+                val lsdPacked = headBuffer[10].toInt() and 0xFF
+                if (lsdPacked and 0x80 != 0) dis.skipBytes(3 * (1 shl ((lsdPacked and 0x07) + 1)))
+                while (true) {
+                    val bt = dis.readUnsignedByte()
+                    if (bt == 0x21) {
+                        val et = dis.readUnsignedByte(); var isMeta = et == 0xFE || et == 0xFF
+                        var blockSize = 2
+                        while (true) { val sl = dis.readUnsignedByte(); blockSize += sl + 1; if (sl == 0) break; dis.skipBytes(sl) }
+                        if (isMeta) size += blockSize
+                    } else if (bt == 0x2C) {
+                        dis.skipBytes(9)
+                        val idPacked = dis.readUnsignedByte(); if (idPacked and 0x80 != 0) dis.skipBytes(3 * (1 shl ((idPacked and 0x07) + 1)))
+                        dis.readUnsignedByte(); while (true) { val sl = dis.readUnsignedByte(); if (sl == 0) break; dis.skipBytes(sl) }
+                    } else break
+                }
+            }
+        } catch (e: Exception) {}
+        return size
+    }
+
+    private fun isPng(b: ByteArray) = b.size >= 8 && b[0].toInt() and 0xFF == 0x89 && b[1].toInt() and 0xFF == 0x50
+    private fun isWebp(b: ByteArray) = b.size >= 12 && String(b, 0, 4) == "RIFF" && String(b, 8, 4) == "WEBP"
+    private fun isGif(b: ByteArray) = b.size >= 3 && String(b, 0, 3) == "GIF"
+    private fun isTiff(b: ByteArray) = b.size >= 2 && (String(b, 0, 2) == "II" || String(b, 0, 2) == "MM")
+
+    private fun checkOrientation(uri: Uri): Boolean {
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { 
+                val exif = ExifInterface(it); val o = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, 1)
+                o != 1 && o != 0
+            } ?: false
+        } catch (e: Exception) { false }
+    }
+
+    private fun extractGps(exif: ExifInterface): GpsData? {
+        val ll = exif.latLong ?: return null
+        return GpsData(ll[0], ll[1], "%.4f, %.4f".format(ll[0], ll[1]), "https://maps.google.com/?q=${ll[0]},${ll[1]}")
+    }
+
+    private fun extractCamera(exif: ExifInterface): String? = exif.getAttribute(ExifInterface.TAG_MODEL)
+    private fun extractDateTime(exif: ExifInterface): String? = exif.getAttribute(ExifInterface.TAG_DATETIME)
+    private fun extractSoftware(exif: ExifInterface): String? = exif.getAttribute(ExifInterface.TAG_SOFTWARE)
+
+    private fun extractAllTags(exif: ExifInterface): AllTags {
+        val imageTags = mutableMapOf<String, String>(); val exifTags = mutableMapOf<String, String>()
+        val gpsTags = mutableMapOf<String, String>(); val techTags = mutableMapOf<String, String>()
+        val tags = listOf(ExifInterface.TAG_MAKE, ExifInterface.TAG_MODEL, ExifInterface.TAG_SOFTWARE, ExifInterface.TAG_DATETIME, ExifInterface.TAG_ARTIST, ExifInterface.TAG_COPYRIGHT, ExifInterface.TAG_USER_COMMENT, ExifInterface.TAG_IMAGE_DESCRIPTION, ExifInterface.TAG_EXPOSURE_TIME, ExifInterface.TAG_F_NUMBER, ExifInterface.TAG_ISO_SPEED_RATINGS, ExifInterface.TAG_FOCAL_LENGTH, ExifInterface.TAG_GPS_LATITUDE, ExifInterface.TAG_GPS_LONGITUDE, ExifInterface.TAG_ORIENTATION, ExifInterface.TAG_IMAGE_WIDTH, ExifInterface.TAG_IMAGE_LENGTH)
+        tags.forEach { t -> exif.getAttribute(t)?.let { v -> when { t.startsWith("GPS") -> gpsTags[t] = v; t in listOf(ExifInterface.TAG_MAKE, ExifInterface.TAG_MODEL, ExifInterface.TAG_SOFTWARE, ExifInterface.TAG_DATETIME) -> imageTags[t] = v; t in listOf(ExifInterface.TAG_IMAGE_WIDTH, ExifInterface.TAG_IMAGE_LENGTH, ExifInterface.TAG_ORIENTATION) -> techTags[t] = v; else -> exifTags[t] = v } } }
+        return AllTags(imageTags, exifTags, gpsTags, techTags)
+    }
+
+    suspend fun saveToGallery(uri: Uri, originalName: String, mimeType: String): Uri? = withContext(Dispatchers.IO) {
+        try {
             val resolver = context.contentResolver
-            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues) ?: return@withContext null
-            resolver.openOutputStream(uri)?.use { it.write(bytes) }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { contentValues.clear(); contentValues.put(MediaStore.Images.Media.IS_PENDING, 0); resolver.update(uri, contentValues, null, null) }
-            uri
+            val inputStream = resolver.openInputStream(uri) ?: return@withContext null
+            val values = ContentValues().apply { put(MediaStore.Images.Media.DISPLAY_NAME, "purged_$originalName"); put(MediaStore.Images.Media.MIME_TYPE, mimeType); if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MetaPurge"); put(MediaStore.Images.Media.IS_PENDING, 1) } }
+            val outUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return@withContext null
+            resolver.openOutputStream(outUri)?.use { inputStream.copyTo(it) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { values.clear(); values.put(MediaStore.Images.Media.IS_PENDING, 0); resolver.update(outUri, values, null, null) }
+            outUri
         } catch (e: Exception) { null }
     }
 }

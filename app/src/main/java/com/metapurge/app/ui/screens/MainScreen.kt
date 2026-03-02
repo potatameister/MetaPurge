@@ -50,10 +50,22 @@ import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+fun MainScreen(initialUris: List<Uri> = emptyList()) {
     val context = LocalContext.current
     
-    val viewModel: MainViewModel = viewModel()
+    val metadataRepository = remember { com.metapurge.app.data.repository.MetadataRepository(context) }
+    val statsRepository = remember { com.metapurge.app.data.repository.StatsRepository(context) }
+    
+    val viewModel: MainViewModel = viewModel(
+        factory = MainViewModel.Factory(context, metadataRepository, statsRepository)
+    )
+    
+    // Process shared images
+    LaunchedEffect(initialUris) {
+        if (initialUris.isNotEmpty()) {
+            viewModel.processUris(initialUris)
+        }
+    }
     val images by viewModel.images.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
     val toast by viewModel.toast.collectAsState()
@@ -137,6 +149,9 @@ fun MainScreen() {
                     Spacer(modifier = Modifier.height(8.dp))
                 }
                 item {
+                    HowItWorks()
+                }
+                item {
                     AnimatedContent(
                         targetState = images.isNotEmpty(),
                         transitionSpec = {
@@ -167,20 +182,46 @@ fun MainScreen() {
                     }
                 }
 
-                val groupedImages = images.groupBy { it.sessionId }
+                val groupedImages = remember(images) { images.groupBy { it.sessionId } }
                 
                 groupedImages.forEach { (sessionId, sessionImages) ->
                     item(key = "session_$sessionId") {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .padding(vertical = 8.dp)
                                 .border(
                                     BorderStroke(1.5.dp, DarkNavy.copy(alpha = 0.2f)),
                                     RoundedCornerShape(24.dp)
                                 )
                                 .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            // Session Header with Batch Save
+                            val purgedCount = sessionImages.count { it.isPurged }
+                            if (purgedCount > 0) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Purged Session",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = DarkNavy.copy(alpha = 0.6f)
+                                    )
+                                    TextButton(
+                                        onClick = { viewModel.saveSessionToGallery(sessionId ?: "") },
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.textButtonColors(contentColor = DarkNavy)
+                                    ) {
+                                        Icon(Icons.Default.SaveAlt, contentDescription = null, size = 16.dp)
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Save $purgedCount to Gallery", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
+
                             sessionImages.forEach { image ->
                                 val dismissState = rememberSwipeToDismissBoxState(
                                     confirmValueChange = {
@@ -894,6 +935,57 @@ private fun SupportSection() {
                 fontWeight = FontWeight.SemiBold,
                 color = DarkNavy
             )
+        }
+    }
+}
+
+@Composable
+private fun HowItWorks() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // What is Metadata
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = White),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.dp, LightGray)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.HelpOutline, contentDescription = null, tint = DarkNavy, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("What is metadata?", fontWeight = FontWeight.Bold, color = DarkNavy, fontSize = 16.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Photos contain hidden digital 'tags' called EXIF data. This includes your GPS coordinates, the exact time, and your device serial number. Most apps share this without you knowing.",
+                    fontSize = 13.sp, color = SlateDark, lineHeight = 18.sp
+                )
+            }
+        }
+
+        // How MetaPurge Works
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = DarkNavy),
+            shape = RoundedCornerShape(24.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoDelete, contentDescription = null, tint = White, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("The 'Nuclear' Approach", fontWeight = FontWeight.Bold, color = White, fontSize = 16.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Unlike other apps that just 'hide' tags, MetaPurge physically cuts the metadata bytes out of the file. It's 100% offline and creates a permanent, metadata-free copy of your photo.",
+                    fontSize = 13.sp, color = White.copy(alpha = 0.8f), lineHeight = 18.sp
+                )
+            }
         }
     }
 }
