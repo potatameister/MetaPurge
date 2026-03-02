@@ -51,6 +51,7 @@ class MetadataRepository(private val context: Context) {
                 when {
                     isPng(head) -> calculatePngMetadataSizeStreaming(bis)
                     isWebp(head) -> calculateWebpMetadataSizeStreaming(bis)
+                    isGif(head) -> calculateGifMetadataSizeStreaming(uri)
                     else -> calculateJpegMetadataSizeStreaming(bis)
                 }
             } ?: 0
@@ -66,11 +67,10 @@ class MetadataRepository(private val context: Context) {
                 bis.mark(12)
                 val head = ByteArray(12); bis.read(head); bis.reset()
                 val needsRotation = checkOrientation(uri)
-                
-                if (needsRotation) {
+                val isTiff = isTiff(head)
+                if (needsRotation || isTiff) {
                     finalName = originalName.substringBeforeLast(".") + ".jpg"
                 }
-
                 FileOutputStream(tempFile).use { outputStream ->
                     if (needsRotation) {
                         fixRotationAndPurgeSafe(uri, outputStream)
@@ -78,6 +78,8 @@ class MetadataRepository(private val context: Context) {
                         when {
                             isPng(head) -> purgePngStream(bis, outputStream)
                             isWebp(head) -> purgeWebpStream(bis, outputStream)
+                            isGif(head) -> purgeGifStream(bis, outputStream)
+                            isTiff -> normalizeTiffToJpeg(uri, outputStream)
                             else -> purgeJpegStream(bis, outputStream)
                         }
                     }
@@ -113,6 +115,14 @@ class MetadataRepository(private val context: Context) {
         if (rotated != bitmap) bitmap.recycle()
         rotated.compress(Bitmap.CompressFormat.JPEG, 90, out)
         rotated.recycle()
+    }
+
+    private fun normalizeTiffToJpeg(uri: Uri, out: OutputStream) {
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            val bitmap = BitmapFactory.decodeStream(input)
+            bitmap?.compress(Bitmap.CompressFormat.JPEG, 95, out)
+            bitmap?.recycle()
+        }
     }
 
     private fun purgeJpegStream(input: InputStream, out: OutputStream) {
@@ -179,6 +189,33 @@ class MetadataRepository(private val context: Context) {
         } finally { if (bodyFile.exists()) bodyFile.delete() }
     }
 
+    private fun purgeGifStream(input: InputStream, out: OutputStream) {
+        val dis = DataInputStream(input); val head = ByteArray(6); dis.readFully(head); out.write(head)
+        val lsd = ByteArray(7); dis.readFully(lsd); out.write(lsd)
+        if (lsd[4].toInt() and 0x80 != 0) {
+            val size = 3 * (1 shl ((lsd[4].toInt() and 0x07) + 1)); val gct = ByteArray(size); dis.readFully(gct); out.write(gct)
+        }
+        try {
+            while (true) {
+                val bt = dis.readUnsignedByte()
+                if (bt == 0x21) {
+                    val et = dis.readUnsignedByte(); var isMeta = et == 0xFE || et == 0xFF
+                    val blocks = mutableListOf<ByteArray>()
+                    while (true) { val sl = dis.readUnsignedByte(); val sub = ByteArray(sl + 1); sub[0] = sl.toByte(); if (sl > 0) dis.readFully(sub, 1, sl); blocks.add(sub); if (sl == 0) break }
+                    if (et == 0xFF && blocks.isNotEmpty() && String(blocks[0], 1, minOf(8, blocks[0].size - 1)) == "NETSCAPE") isMeta = false
+                    if (!isMeta) { out.write(0x21); out.write(et); blocks.forEach { out.write(it) } }
+                } else if (bt == 0x2C) {
+                    out.write(0x2C); val id = ByteArray(9); dis.readFully(id); out.write(id)
+                    if (id[8].toInt() and 0x80 != 0) {
+                        val size = 3 * (1 shl ((id[8].toInt() and 0x07) + 1)); val lct = ByteArray(size); dis.readFully(lct); out.write(lct)
+                    }
+                    out.write(dis.readUnsignedByte())
+                    while (true) { val sl = dis.readUnsignedByte(); out.write(sl); if (sl == 0) break; val sub = ByteArray(sl); dis.readFully(sub); out.write(sub) }
+                } else if (bt == 0x3B) { out.write(0x3B); break } else break
+            }
+        } catch (e: Exception) {}
+    }
+
     private fun calculateJpegMetadataSizeStreaming(input: InputStream): Long {
         var size = 0L; val dis = DataInputStream(input)
         try {
@@ -222,8 +259,36 @@ class MetadataRepository(private val context: Context) {
         return size
     }
 
+    private fun calculateGifMetadataSizeStreaming(uri: Uri): Long {
+        var size = 0L
+        try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val dis = DataInputStream(input); dis.skipBytes(13)
+                val headBuffer = ByteArray(13); context.contentResolver.openInputStream(uri)?.use { it.read(headBuffer) }
+                val lsdPacked = headBuffer[10].toInt() and 0xFF
+                if (lsdPacked and 0x80 != 0) dis.skipBytes(3 * (1 shl ((lsdPacked and 0x07) + 1)))
+                while (true) {
+                    val bt = dis.readUnsignedByte()
+                    if (bt == 0x21) {
+                        val et = dis.readUnsignedByte(); var isMeta = et == 0xFE || et == 0xFF
+                        var blockSize = 2
+                        while (true) { val sl = dis.readUnsignedByte(); blockSize += sl + 1; if (sl == 0) break; dis.skipBytes(sl) }
+                        if (isMeta) size += blockSize
+                    } else if (bt == 0x2C) {
+                        dis.skipBytes(9)
+                        val idPacked = dis.readUnsignedByte(); if (idPacked and 0x80 != 0) dis.skipBytes(3 * (1 shl ((idPacked and 0x07) + 1)))
+                        dis.readUnsignedByte(); while (true) { val sl = dis.readUnsignedByte(); if (sl == 0) break; dis.skipBytes(sl) }
+                    } else break
+                }
+            }
+        } catch (e: Exception) {}
+        return size
+    }
+
     private fun isPng(b: ByteArray) = b.size >= 8 && b[0].toInt() and 0xFF == 0x89 && b[1].toInt() and 0xFF == 0x50
     private fun isWebp(b: ByteArray) = b.size >= 12 && String(b, 0, 4) == "RIFF" && String(b, 8, 4) == "WEBP"
+    private fun isGif(b: ByteArray) = b.size >= 3 && String(b, 0, 3) == "GIF"
+    private fun isTiff(b: ByteArray) = b.size >= 2 && (String(b, 0, 2) == "II" || String(b, 0, 2) == "MM")
 
     private fun checkOrientation(uri: Uri): Boolean {
         return try {
