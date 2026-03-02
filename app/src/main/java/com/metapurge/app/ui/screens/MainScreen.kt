@@ -68,7 +68,7 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            AsyncImage(model = R.drawable.ic_launcher, contentDescription = null, modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
+                            AsyncImage(model = R.drawable.ic_metapurge, contentDescription = null, modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
                             Text("MetaPurge", fontWeight = FontWeight.Bold, color = White, fontSize = 22.sp)
                         }
                     },
