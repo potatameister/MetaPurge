@@ -61,6 +61,11 @@ android {
         buildConfig = false
     }
 
+    dependenciesInfo {
+        includeInBundle = false
+        includeInApk = false
+    }
+
     androidResources {
         @Suppress("UnstableApiUsage")
         noCompress.add(".webp")
