@@ -57,6 +57,8 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
 
     LaunchedEffect(toast) { toast?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show(); delay(2000); viewModel.dismissToast() } }
 
+    val groupedImages = remember(images) { images.groupBy { it.sessionId } }
+
     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(White, Color(0xFFF1F5F9), LightGray)))) {
         Scaffold(
             containerColor = Color.Transparent,
@@ -94,7 +96,6 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
                     item { BatchActions(count = images.count { !it.isPurged && it.metadata?.hasExif == true }, isProcessing = isProcessing, onPurgeAll = { viewModel.purgeAll() }, onClear = { viewModel.clearAll() }) }
                 }
 
-                val groupedImages = images.groupBy { it.sessionId }
                 groupedImages.forEach { (sessionId, sessionImages) ->
                     item(key = "session_$sessionId") {
                         SessionGroup(sessionId = sessionId, sessionImages = sessionImages, viewModel = viewModel, context = context)
@@ -200,8 +201,10 @@ private fun ImageCard(image: ImageItem, onPurge: () -> Unit, onRemove: () -> Uni
 private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Show main 18 tags
-        metadata.allTags.image.forEach { (k, v) ->
-            FullMetadataRow(k, v)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            metadata.allTags.image.forEach { (k, v) ->
+                FullMetadataRow(k, v)
+            }
         }
 
         var expertMode by remember { mutableStateOf(false) }
@@ -229,7 +232,8 @@ private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata)
 @Composable
 private fun FullMetadataRow(key: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(key.replace("TAG_", "").replace("_", " "), fontSize = 11.sp, color = SlateDark, modifier = Modifier.weight(1f))
+        val label = key.replace("TAG_", "").replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+        Text(label, fontSize = 11.sp, color = SlateDark, modifier = Modifier.weight(1f))
         Text(value, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = DarkNavy, modifier = Modifier.weight(1.5f), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
