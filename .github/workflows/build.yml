@@ -45,10 +45,10 @@ jobs:
 
       - name: Rename and Upload APK
         run: |
-          mv app/build/outputs/apk/release/app-release.apk MetaPurge-v1.0.apk
+          mv app/build/outputs/apk/release/app-release.apk MetaPurge-1.0.apk
           
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: MetaPurge-APK
-          path: MetaPurge-v1.0.apk
+          path: MetaPurge-1.0.apk
