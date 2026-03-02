@@ -507,7 +507,9 @@ private fun shareImage(context: android.content.Context, image: ImageItem) {
         putExtra(Intent.EXTRA_STREAM, shareUri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(intent, "Share Cleaned Photo"))
+    val chooser = Intent.createChooser(intent, "Share Cleaned Photo")
+    chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.startActivity(chooser)
 }
 
 private fun Modifier.size(size: Int): Modifier = this.size(size.dp)

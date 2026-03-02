@@ -1,0 +1,1 @@
+• Initial Release\n• Nuclear metadata stripping for JPEG, PNG, WebP\n• 100% Offline & Zero Permissions
