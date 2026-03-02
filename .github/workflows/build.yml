@@ -21,7 +21,6 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          # Cache disabled for 100% RB integrity per user request
 
       - name: Create Keystore
         if: env.KEYSTORE_FILE != null
@@ -41,12 +40,15 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          # Set fixed build timestamp based on the latest commit
           export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
           ./gradlew assembleRelease --no-build-cache --no-daemon
 
+      - name: Rename and Upload APK
+        run: |
+          mv app/build/outputs/apk/release/app-release.apk MetaPurge-v1.0.apk
+          
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MetaPurge-release
-          path: app/build/outputs/apk/release/
+          name: MetaPurge-APK
+          path: MetaPurge-v1.0.apk
