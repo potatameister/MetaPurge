@@ -172,90 +172,16 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
                     }
                 }
 
-                val groupedImages = remember(images) { images.groupBy { it.sessionId } }
+                val groupedImages = images.groupBy { it.sessionId }
                 
                 groupedImages.forEach { (sessionId, sessionImages) ->
                     item(key = "session_$sessionId") {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp)
-                                .border(
-                                    BorderStroke(1.5.dp, DarkNavy.copy(alpha = 0.2f)),
-                                    RoundedCornerShape(24.dp)
-                                )
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            val purgedCount = sessionImages.count { it.isPurged }
-                            if (purgedCount > 0) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Purged Session",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = DarkNavy.copy(alpha = 0.6f)
-                                    )
-                                    TextButton(
-                                        onClick = { viewModel.saveSessionToGallery(sessionId) },
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = ButtonDefaults.textButtonColors(contentColor = DarkNavy)
-                                    ) {
-                                        Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("Save $purgedCount to Gallery", style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
-                            }
-
-                            sessionImages.forEach { image ->
-                                val dismissState = rememberSwipeToDismissBoxState(
-                                    confirmValueChange = {
-                                        if (it == SwipeToDismissBoxValue.EndToStart) {
-                                            viewModel.removeImage(image.id)
-                                            true
-                                        } else false
-                                    }
-                                )
-
-                                SwipeToDismissBox(
-                                    state = dismissState,
-                                    enableDismissFromStartToEnd = false,
-                                    backgroundContent = {
-                                        val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-                                            Color.Red.copy(alpha = 0.8f)
-                                        } else Color.Transparent
-                                        
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .clip(RoundedCornerShape(20.dp))
-                                                .background(color)
-                                                .padding(horizontal = 20.dp),
-                                            contentAlignment = Alignment.CenterEnd
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Delete,
-                                                contentDescription = "Delete",
-                                                tint = White
-                                            )
-                                        }
-                                    },
-                                    content = {
-                                        ImageCard(
-                                            image = image,
-                                            onPurge = { viewModel.purgeImage(image.id) },
-                                            onRemove = { viewModel.removeImage(image.id) },
-                                            onShare = { shareImage(context, image) },
-                                            formatBytes = viewModel::formatBytes
-                                        )
-                                    }
-                                )
-                            }
-                        }
+                        SessionGroup(
+                            sessionId = sessionId,
+                            sessionImages = sessionImages,
+                            viewModel = viewModel,
+                            context = context
+                        )
                     }
                 }
 
@@ -272,6 +198,95 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
 
         if (showInfoModal) {
             InfoModal(onDismiss = { showInfoModal = false })
+        }
+    }
+}
+
+@Composable
+private fun SessionGroup(
+    sessionId: Long,
+    sessionImages: List<ImageItem>,
+    viewModel: MainViewModel,
+    context: android.content.Context
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .border(
+                BorderStroke(1.5.dp, DarkNavy.copy(alpha = 0.2f)),
+                RoundedCornerShape(24.dp)
+            )
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        val purgedCount = sessionImages.count { it.isPurged }
+        if (purgedCount > 0) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Purged Session",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = DarkNavy.copy(alpha = 0.6f)
+                )
+                TextButton(
+                    onClick = { viewModel.saveSessionToGallery(sessionId) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.textButtonColors(contentColor = DarkNavy)
+                ) {
+                    Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Save $purgedCount to Gallery", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+
+        sessionImages.forEach { image ->
+            val dismissState = rememberSwipeToDismissBoxState(
+                confirmValueChange = {
+                    if (it == SwipeToDismissBoxValue.EndToStart) {
+                        viewModel.removeImage(image.id)
+                        true
+                    } else false
+                }
+            )
+
+            SwipeToDismissBox(
+                state = dismissState,
+                enableDismissFromStartToEnd = false,
+                backgroundContent = {
+                    val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                        Color.Red.copy(alpha = 0.8f)
+                    } else Color.Transparent
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(color)
+                            .padding(horizontal = 20.dp),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = White
+                        )
+                    }
+                },
+                content = {
+                    ImageCard(
+                        image = image,
+                        onPurge = { viewModel.purgeImage(image.id) },
+                        onRemove = { viewModel.removeImage(image.id) },
+                        onShare = { shareImage(context, image) },
+                        formatBytes = viewModel::formatBytes
+                    )
+                }
+            )
         }
     }
 }
