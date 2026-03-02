@@ -133,9 +133,9 @@ class MetadataRepository(private val context: Context) {
             while (true) {
                 var b = dis.readUnsignedByte()
                 if (b != 0xFF) continue
-                var m = dis.readUnsignedByte()
-                while (m == 0xFF) m = dis.readUnsignedByte()
-                if (m == 0xDA) { out.write(0xFF); out.write(0xDA); dis.copyTo(out); break }
+                var marker = dis.readUnsignedByte()
+                while (marker == 0xFF) marker = dis.readUnsignedByte()
+                if (marker == 0xDA) { out.write(0xFF); out.write(0xDA); dis.copyTo(out); break }
                 val l = dis.readUnsignedShort()
                 if (m !in 0xE0..0xEF && m != 0xFE) {
                     out.write(0xFF); out.write(m); out.write((l shr 8) and 0xFF); out.write(l and 0xFF)
@@ -155,7 +155,7 @@ class MetadataRepository(private val context: Context) {
                 if (ts in listOf("IHDR", "PLTE", "IDAT", "IEND", "tRNS", "sRGB", "gAMA", "cHRM")) {
                     val dos = DataOutputStream(out); dos.writeInt(len); dos.write(type)
                     val buf = ByteArray(8192); var rem = len
-                    while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buf.size)); dos.write(buf, 0, r); rem -= r }
+                    while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buffer.size)); dos.write(buffer, 0, r); rem -= r }
                     dos.writeInt(dis.readInt())
                 } else dis.skipBytes(len + 4)
                 if (ts == "IEND") break
@@ -264,7 +264,6 @@ class MetadataRepository(private val context: Context) {
         try {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 val dis = DataInputStream(input); dis.skipBytes(13)
-                // Skip Global Color Table if present
                 val headBuffer = ByteArray(13); context.contentResolver.openInputStream(uri)?.use { it.read(headBuffer) }
                 val lsdPacked = headBuffer[10].toInt() and 0xFF
                 if (lsdPacked and 0x80 != 0) dis.skipBytes(3 * (1 shl ((lsdPacked and 0x07) + 1)))
@@ -310,11 +309,71 @@ class MetadataRepository(private val context: Context) {
     private fun extractSoftware(exif: ExifInterface): String? = exif.getAttribute(ExifInterface.TAG_SOFTWARE)
 
     private fun extractAllTags(exif: ExifInterface): AllTags {
-        val imageTags = mutableMapOf<String, String>(); val exifTags = mutableMapOf<String, String>()
-        val gpsTags = mutableMapOf<String, String>(); val techTags = mutableMapOf<String, String>()
-        val tags = listOf(ExifInterface.TAG_MAKE, ExifInterface.TAG_MODEL, ExifInterface.TAG_SOFTWARE, ExifInterface.TAG_DATETIME, ExifInterface.TAG_ARTIST, ExifInterface.TAG_COPYRIGHT, ExifInterface.TAG_USER_COMMENT, ExifInterface.TAG_IMAGE_DESCRIPTION, ExifInterface.TAG_EXPOSURE_TIME, ExifInterface.TAG_F_NUMBER, ExifInterface.TAG_ISO_SPEED_RATINGS, ExifInterface.TAG_FOCAL_LENGTH, ExifInterface.TAG_GPS_LATITUDE, ExifInterface.TAG_GPS_LONGITUDE, ExifInterface.TAG_ORIENTATION, ExifInterface.TAG_IMAGE_WIDTH, ExifInterface.TAG_IMAGE_LENGTH)
-        tags.forEach { t -> exif.getAttribute(t)?.let { v -> when { t.startsWith("GPS") -> gpsTags[t] = v; t in listOf(ExifInterface.TAG_MAKE, ExifInterface.TAG_MODEL, ExifInterface.TAG_SOFTWARE, ExifInterface.TAG_DATETIME) -> imageTags[t] = v; t in listOf(ExifInterface.TAG_IMAGE_WIDTH, ExifInterface.TAG_IMAGE_LENGTH, ExifInterface.TAG_ORIENTATION) -> techTags[t] = v; else -> exifTags[t] = v } } }
-        return AllTags(imageTags, exifTags, gpsTags, techTags)
+        val mainTags = mutableMapOf<String, String>()
+        val techTags = mutableMapOf<String, String>()
+
+        val eighteenTags = listOf(
+            ExifInterface.TAG_MAKE, ExifInterface.TAG_MODEL, ExifInterface.TAG_SOFTWARE,
+            ExifInterface.TAG_DATETIME, ExifInterface.TAG_ARTIST, ExifInterface.TAG_COPYRIGHT,
+            ExifInterface.TAG_IMAGE_DESCRIPTION, ExifInterface.TAG_USER_COMMENT,
+            ExifInterface.TAG_EXPOSURE_TIME, ExifInterface.TAG_F_NUMBER, ExifInterface.TAG_ISO_SPEED_RATINGS,
+            ExifInterface.TAG_FOCAL_LENGTH, ExifInterface.TAG_LENS_MAKE, ExifInterface.TAG_LENS_MODEL,
+            ExifInterface.TAG_GPS_LATITUDE, ExifInterface.TAG_GPS_LONGITUDE, ExifInterface.TAG_GPS_ALTITUDE,
+            ExifInterface.TAG_ORIENTATION
+        )
+
+        val allPossibleTags = listOf(
+            ExifInterface.TAG_IMAGE_WIDTH, ExifInterface.TAG_IMAGE_LENGTH, ExifInterface.TAG_BITS_PER_SAMPLE,
+            ExifInterface.TAG_COMPRESSION, ExifInterface.TAG_PHOTOMETRIC_INTERPRETATION,
+            ExifInterface.TAG_SAMPLES_PER_PIXEL, ExifInterface.TAG_PLANAR_CONFIGURATION,
+            ExifInterface.TAG_Y_CB_CR_SUB_SAMPLING, ExifInterface.TAG_Y_CB_CR_POSITIONING,
+            ExifInterface.TAG_X_RESOLUTION, ExifInterface.TAG_Y_RESOLUTION, ExifInterface.TAG_RESOLUTION_UNIT,
+            ExifInterface.TAG_STRIP_OFFSETS, ExifInterface.TAG_ROWS_PER_STRIP, ExifInterface.TAG_STRIP_BYTE_COUNTS,
+            ExifInterface.TAG_JPEG_INTERCHANGE_FORMAT, ExifInterface.TAG_JPEG_INTERCHANGE_FORMAT_LENGTH,
+            ExifInterface.TAG_TRANSFER_FUNCTION, ExifInterface.TAG_WHITE_POINT, ExifInterface.TAG_PRIMARY_CHROMATICITIES,
+            ExifInterface.TAG_Y_CB_CR_COEFFICIENTS, ExifInterface.TAG_REFERENCE_BLACK_WHITE,
+            ExifInterface.TAG_EXIF_VERSION, ExifInterface.TAG_FLASHPIX_VERSION, ExifInterface.TAG_COLOR_SPACE,
+            ExifInterface.TAG_COMPONENTS_CONFIGURATION, ExifInterface.TAG_COMPRESSED_BITS_PER_PIXEL,
+            ExifInterface.TAG_PIXEL_X_DIMENSION, ExifInterface.TAG_PIXEL_Y_DIMENSION, ExifInterface.TAG_MAKER_NOTE,
+            ExifInterface.TAG_RELATED_SOUND_FILE, ExifInterface.TAG_DATE_TIME_ORIGINAL, ExifInterface.TAG_DATE_TIME_DIGITIZED,
+            ExifInterface.TAG_SUB_SEC_TIME, ExifInterface.TAG_SUB_SEC_TIME_ORIGINAL, ExifInterface.TAG_SUB_SEC_TIME_DIGITIZED,
+            ExifInterface.TAG_EXPOSURE_PROGRAM, ExifInterface.TAG_SPECTRAL_SENSITIVITY, ExifInterface.TAG_OECF,
+            ExifInterface.TAG_SHUTTER_SPEED_VALUE, ExifInterface.TAG_APERTURE_VALUE, ExifInterface.TAG_BRIGHTNESS_VALUE,
+            ExifInterface.TAG_EXPOSURE_BIAS_VALUE, ExifInterface.TAG_MAX_APERTURE_VALUE, ExifInterface.TAG_SUBJECT_DISTANCE,
+            ExifInterface.TAG_METERING_MODE, ExifInterface.TAG_LIGHT_SOURCE, ExifInterface.TAG_FLASH,
+            ExifInterface.TAG_SUBJECT_AREA, ExifInterface.TAG_FLASH_ENERGY, ExifInterface.TAG_SPATIAL_FREQUENCY_RESPONSE,
+            ExifInterface.TAG_FOCAL_PLANE_X_RESOLUTION, ExifInterface.TAG_FOCAL_PLANE_Y_RESOLUTION,
+            ExifInterface.TAG_FOCAL_PLANE_RESOLUTION_UNIT, ExifInterface.TAG_SUBJECT_LOCATION, ExifInterface.TAG_EXPOSURE_INDEX,
+            ExifInterface.TAG_SENSING_METHOD, ExifInterface.TAG_FILE_SOURCE, ExifInterface.TAG_SCENE_TYPE,
+            ExifInterface.TAG_CFA_PATTERN, ExifInterface.TAG_CUSTOM_RENDERED, ExifInterface.TAG_EXPOSURE_MODE,
+            ExifInterface.TAG_WHITE_BALANCE, ExifInterface.TAG_DIGITAL_ZOOM_RATIO, ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM,
+            ExifInterface.TAG_SCENE_CAPTURE_TYPE, ExifInterface.TAG_GAIN_CONTROL, ExifInterface.TAG_CONTRAST,
+            ExifInterface.TAG_SATURATION, ExifInterface.TAG_SHARPNESS, ExifInterface.TAG_DEVICE_SETTING_DESCRIPTION,
+            ExifInterface.TAG_SUBJECT_DISTANCE_RANGE, ExifInterface.TAG_IMAGE_UNIQUE_ID, ExifInterface.TAG_GPS_VERSION_ID,
+            ExifInterface.TAG_GPS_LATITUDE_REF, ExifInterface.TAG_GPS_LONGITUDE_REF, ExifInterface.TAG_GPS_ALTITUDE_REF,
+            ExifInterface.TAG_GPS_TIMESTAMP, ExifInterface.TAG_GPS_SATELLITES, ExifInterface.TAG_GPS_STATUS,
+            ExifInterface.TAG_GPS_MEASURE_MODE, ExifInterface.TAG_GPS_DOP, ExifInterface.TAG_GPS_SPEED_REF,
+            ExifInterface.TAG_GPS_SPEED, ExifInterface.TAG_GPS_TRACK_REF, ExifInterface.TAG_GPS_TRACK,
+            ExifInterface.TAG_GPS_IMG_DIRECTION_REF, ExifInterface.TAG_GPS_IMG_DIRECTION, ExifInterface.TAG_GPS_MAP_DATUM,
+            ExifInterface.TAG_GPS_DEST_LATITUDE_REF, ExifInterface.TAG_GPS_DEST_LATITUDE,
+            ExifInterface.TAG_GPS_DEST_LONGITUDE_REF, ExifInterface.TAG_GPS_DEST_LONGITUDE,
+            ExifInterface.TAG_GPS_DEST_BEARING_REF, ExifInterface.TAG_GPS_DEST_BEARING,
+            ExifInterface.TAG_GPS_DEST_DISTANCE_REF, ExifInterface.TAG_GPS_DEST_DISTANCE,
+            ExifInterface.TAG_GPS_PROCESSING_METHOD, ExifInterface.TAG_GPS_AREA_INFORMATION,
+            ExifInterface.TAG_GPS_DATE_STAMP, ExifInterface.TAG_GPS_DIFFERENTIAL
+        )
+
+        eighteenTags.forEach { tag ->
+            exif.getAttribute(tag)?.let { value -> mainTags[tag] = value }
+        }
+
+        allPossibleTags.forEach { tag ->
+            if (tag !in eighteenTags) {
+                exif.getAttribute(tag)?.let { value -> techTags[tag] = value }
+            }
+        }
+
+        return AllTags(mainTags, emptyMap(), emptyMap(), techTags)
     }
 
     suspend fun saveToGallery(uri: Uri, originalName: String, mimeType: String): Uri? = withContext(Dispatchers.IO) {

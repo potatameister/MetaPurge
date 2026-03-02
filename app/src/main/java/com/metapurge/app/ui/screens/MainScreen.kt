@@ -101,7 +101,6 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
                     }
                 }
 
-                item { SupportSection() }
                 item { HowItWorks() }
                 item { Spacer(modifier = Modifier.height(80.dp)) }
             }
@@ -112,7 +111,7 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
 
 @Composable
 private fun SessionGroup(sessionId: Long, sessionImages: List<ImageItem>, viewModel: MainViewModel, context: android.content.Context) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         val purgedCount = sessionImages.count { it.isPurged }
         if (purgedCount > 0) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -200,10 +199,10 @@ private fun ImageCard(image: ImageItem, onPurge: () -> Unit, onRemove: () -> Uni
 @Composable
 private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        metadata.gps?.let { MetadataItem(Icons.Default.LocationOn, "Location", it.display) }
-        metadata.camera?.let { MetadataItem(Icons.Default.PhotoCamera, "Device", it) }
-        metadata.dateTime?.let { MetadataItem(Icons.Default.Event, "Taken on", it) }
-        metadata.software?.let { MetadataItem(Icons.Default.Code, "Software", it) }
+        // Show main 18 tags
+        metadata.allTags.image.forEach { (k, v) ->
+            FullMetadataRow(k, v)
+        }
 
         var expertMode by remember { mutableStateOf(false) }
         val expertRotation by animateFloatAsState(if (expertMode) 180f else 0f, label = "")
@@ -213,16 +212,13 @@ private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(14.dp), tint = SlateDark)
                     Spacer(Modifier.width(8.dp))
-                    Text("Expert Mode (All Tags)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SlateDark)
+                    Text("Full Technical Metadata", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SlateDark)
                 }
                 Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.rotate(expertRotation), tint = SlateDark)
             }
             if (expertMode) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    metadata.allTags.image.forEach { (k, v) -> FullMetadataRow(k, v) }
-                    metadata.allTags.exif.forEach { (k, v) -> FullMetadataRow(k, v) }
-                    metadata.allTags.gps.forEach { (k, v) -> FullMetadataRow(k, v) }
                     metadata.allTags.technical.forEach { (k, v) -> FullMetadataRow(k, v) }
                 }
             }
@@ -231,18 +227,9 @@ private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata)
 }
 
 @Composable
-private fun MetadataItem(icon: ImageVector, label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = SkyBlue)
-        Spacer(modifier = Modifier.width(8.dp))
-        Column { Text(label, fontSize = 10.sp, color = SlateGray); Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = DarkNavy) }
-    }
-}
-
-@Composable
 private fun FullMetadataRow(key: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(key.replace("_", " "), fontSize = 11.sp, color = SlateDark, modifier = Modifier.weight(1f))
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(key.replace("TAG_", "").replace("_", " "), fontSize = 11.sp, color = SlateDark, modifier = Modifier.weight(1f))
         Text(value, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = DarkNavy, modifier = Modifier.weight(1.5f), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -258,7 +245,6 @@ private fun SupportersModal(onDismiss: () -> Unit) {
             Text("MetaPurge is built with love and provided for free. Your support helps keep the project alive and 100% FLOSS.", fontSize = 14.sp, color = SlateDark, lineHeight = 20.sp)
             Spacer(modifier = Modifier.height(24.dp))
             
-            // Buy Me A Coffee (Yellow Card)
             Card(
                 modifier = Modifier.fillMaxWidth().clickable { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://buymeacoffee.com/potatameister"))) },
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFDD00)),
@@ -273,7 +259,6 @@ private fun SupportersModal(onDismiss: () -> Unit) {
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            // GitHub Sponsor (Dark Card)
             Card(
                 modifier = Modifier.fillMaxWidth().clickable { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/sponsors/potatameister"))) },
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF24292F)),
@@ -292,41 +277,32 @@ private fun SupportersModal(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun SupportSection() {
-    val context = LocalContext.current
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://buymeacoffee.com/potatameister"))) },
-        colors = CardDefaults.cardColors(containerColor = SkyBlue.copy(alpha = 0.1f)),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-            Icon(Icons.Default.Favorite, contentDescription = null, tint = SkyBlue, modifier = Modifier.size(20.dp))
-            Spacer(modifier = Modifier.width(8.dp)); Text("Support MetaPurge", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = DarkNavy)
-        }
-    }
-}
-
-@Composable
 private fun HowItWorks() {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = White), shape = RoundedCornerShape(24.dp), border = BorderStroke(1.dp, LightGray)) {
-            Column(modifier = Modifier.padding(20.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = White),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, LightGray)
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.HelpOutline, contentDescription = null, modifier = Modifier.size(20.dp), tint = DarkNavy)
                     Spacer(Modifier.width(8.dp)); Text("What is metadata?", fontWeight = FontWeight.Bold, color = DarkNavy, fontSize = 16.sp)
                 }
                 Spacer(Modifier.height(8.dp))
-                Text("Photos contain hidden digital 'tags' called EXIF data. This includes your GPS coordinates, the exact time, and your device serial number. Most apps share this without you knowing.", fontSize = 13.sp, color = SlateDark, lineHeight = 18.sp)
+                Text("Photos contain hidden digital 'tags' (EXIF data) like your GPS coordinates, exact time, and device info. Most apps share this without you knowing.", fontSize = 13.sp, color = SlateDark, lineHeight = 18.sp)
             }
-        }
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = DarkNavy), shape = RoundedCornerShape(24.dp)) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            
+            HorizontalDivider(color = LightGray.copy(alpha = 0.5f))
+
+            Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(20.dp), tint = White)
-                    Spacer(Modifier.width(8.dp)); Text("Privacy-First Cleaning", fontWeight = FontWeight.Bold, color = White, fontSize = 16.sp)
+                    Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(20.dp), tint = DarkNavy)
+                    Spacer(Modifier.width(8.dp)); Text("Privacy-First Cleaning", fontWeight = FontWeight.Bold, color = DarkNavy, fontSize = 16.sp)
                 }
                 Spacer(Modifier.height(8.dp))
-                Text("MetaPurge uses a surgical approach to privacy. It parses the file's internal structure and physically removes the segments containing metadata while leaving your pixels untouched. All processing happens 100% offline on your device.", fontSize = 13.sp, color = White.copy(alpha = 0.8f), lineHeight = 18.sp)
+                Text("MetaPurge uses a surgical approach. It parses the file and physically removes metadata segments while leaving pixels untouched. All processing happens 100% offline.", fontSize = 13.sp, color = SlateDark, lineHeight = 18.sp)
             }
         }
     }
