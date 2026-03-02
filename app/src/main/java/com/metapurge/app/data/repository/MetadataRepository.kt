@@ -127,7 +127,7 @@ class MetadataRepository(private val context: Context) {
                 val l = dis.readUnsignedShort()
                 if (marker !in 0xE0..0xEF && marker != 0xFE) {
                     out.write(0xFF); out.write(marker); out.write((l shr 8) and 0xFF); out.write(l and 0xFF)
-                    val buf = ByteArray(l - 2); dis.readFully(buf); out.write(buf)
+                    val buffer = ByteArray(l - 2); dis.readFully(buffer); out.write(buffer)
                 } else dis.skipBytes(l - 2)
             }
         } catch (e: Exception) {}
@@ -143,7 +143,7 @@ class MetadataRepository(private val context: Context) {
                 if (ts in listOf("IHDR", "PLTE", "IDAT", "IEND", "tRNS", "sRGB", "gAMA", "cHRM")) {
                     val dos = DataOutputStream(out); dos.writeInt(len); dos.write(type)
                     val buf = ByteArray(8192); var rem = len
-                    while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buffer.size)); dos.write(buffer, 0, r); rem -= r }
+                    while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buf.size)); dos.write(buf, 0, r); rem -= r }
                     dos.writeInt(dis.readInt())
                 } else dis.skipBytes(len + 4)
                 if (ts == "IEND") break
@@ -164,7 +164,7 @@ class MetadataRepository(private val context: Context) {
                         if (ts !in listOf("EXIF", "XMP ", "ICCP")) {
                             bodyOut.write(type); DataOutputStream(bodyOut).writeInt(lenLE)
                             val buf = ByteArray(8192); var rem = len
-                            while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buffer.size)); bodyOut.write(buf, 0, r); rem -= r }
+                            while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buf.size)); bodyOut.write(buf, 0, r); rem -= r }
                             bodySize += 8 + len
                             if (len % 2 != 0) { bodyOut.write(0); dis.skipBytes(1); bodySize += 1 }
                         } else dis.skipBytes(len + (len % 2))
