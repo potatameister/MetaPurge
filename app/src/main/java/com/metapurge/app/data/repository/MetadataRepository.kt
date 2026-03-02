@@ -58,8 +58,9 @@ class MetadataRepository(private val context: Context) {
         } catch (e: Exception) { 0 }
     }
 
-    suspend fun purgeMetadata(uri: Uri, originalName: String): Uri? = withContext(Dispatchers.IO) {
-        val tempFile = File(context.cacheDir, "purging_${System.currentTimeMillis()}")
+    // FIX #2: Add ID to prevent filename collisions in cache
+    suspend fun purgeMetadata(uri: Uri, originalName: String, id: String): Uri? = withContext(Dispatchers.IO) {
+        val tempFile = File(context.cacheDir, "purging_${id}_${System.currentTimeMillis()}")
         var finalName = originalName
         try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -85,7 +86,7 @@ class MetadataRepository(private val context: Context) {
                     }
                 }
             }
-            val finalFile = File(context.cacheDir, "purged_${finalName}")
+            val finalFile = File(context.cacheDir, "purged_${id}_${finalName}")
             if (finalFile.exists()) finalFile.delete()
             tempFile.renameTo(finalFile)
             Uri.fromFile(finalFile)
@@ -176,7 +177,7 @@ class MetadataRepository(private val context: Context) {
                         if (ts !in listOf("EXIF", "XMP ", "ICCP")) {
                             bodyOut.write(type); DataOutputStream(bodyOut).writeInt(lenLE)
                             val buf = ByteArray(8192); var rem = len
-                            while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buf.size)); bodyOut.write(buf, 0, r); rem -= r }
+                            while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buffer.size)); bodyOut.write(buf, 0, r); rem -= r }
                             bodySize += 8 + len
                             if (len % 2 != 0) { bodyOut.write(0); dis.skipBytes(1); bodySize += 1 }
                         } else dis.skipBytes(len + (len % 2))

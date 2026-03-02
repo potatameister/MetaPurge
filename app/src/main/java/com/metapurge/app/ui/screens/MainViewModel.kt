@@ -57,7 +57,7 @@ class MainViewModel(
     fun purgeImage(id: String) {
         viewModelScope.launch {
             val image = _images.value.find { it.id == id } ?: return@launch
-            val cleanUri = metadataRepository.purgeMetadata(Uri.parse(image.uri), image.name)
+            val cleanUri = metadataRepository.purgeMetadata(Uri.parse(image.uri), image.name, image.id)
             if (cleanUri != null) {
                 _images.value = _images.value.map { if (it.id == id) it.copy(isPurged = true, cleanedUri = cleanUri.toString()) else it }
                 if (image.metadata?.hasExif == true) {
@@ -72,7 +72,7 @@ class MainViewModel(
             _isProcessing.value = true
             val imagesToPurge = _images.value.filter { !it.isPurged && it.metadata?.hasExif == true }
             imagesToPurge.forEach { image ->
-                val cleanUri = metadataRepository.purgeMetadata(Uri.parse(image.uri), image.name)
+                val cleanUri = metadataRepository.purgeMetadata(Uri.parse(image.uri), image.name, image.id)
                 if (cleanUri != null) {
                     _images.value = _images.value.map { if (it.id == image.id) it.copy(isPurged = true, cleanedUri = cleanUri.toString()) else it }
                     statsRepository.incrementStats(1, image.metadata?.metadataSize ?: 0, if (image.metadata?.gps != null) 1 else 0)
@@ -153,10 +153,7 @@ class MainViewModel(
         var res: String? = null
         if (uri.scheme == "content") {
             context.contentResolver.query(uri, null, null, null, null)?.use {
-                if (it.moveToFirst()) {
-                    val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (index != -1) res = it.getString(index)
-                }
+                if (it.moveToFirst()) res = it.getString(it.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
             }
         }
         return res ?: uri.path?.substringAfterLast('/')

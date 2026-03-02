@@ -71,10 +71,10 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
                             AsyncImage(
                                 model = R.drawable.ic_metapurge, 
                                 contentDescription = null, 
-                                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)), 
+                                modifier = Modifier.size(32.dp).clip(RoundedCornerShape(6.dp)), 
                                 contentScale = ContentScale.Crop
                             )
-                            Text("MetaPurge", fontWeight = FontWeight.Bold, color = White, fontSize = 20.sp)
+                            Text("MetaPurge", fontWeight = FontWeight.Bold, color = White, fontSize = 18.sp)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkNavy, titleContentColor = White),
@@ -128,6 +128,12 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
 @Composable
 private fun SessionGroup(sessionImages: List<ImageItem>, viewModel: MainViewModel, context: android.content.Context) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        val purgedCount = sessionImages.count { it.isPurged }
+        if (purgedCount > 0) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "Purged Session", style = MaterialTheme.typography.labelMedium, color = DarkNavy.copy(alpha = 0.6f))
+            }
+        }
         sessionImages.forEach { image ->
             val dismissState = rememberSwipeToDismissBoxState(confirmValueChange = { if (it == SwipeToDismissBoxValue.EndToStart) { viewModel.removeImage(image.id); true } else false })
             SwipeToDismissBox(
@@ -272,6 +278,20 @@ private fun SupportersModal(onDismiss: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
             
             Card(
+                modifier = Modifier.fillMaxWidth().clickable { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/potatameister/MetaPurge"))) },
+                colors = CardDefaults.cardColors(containerColor = DarkNavyLight),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    Icon(Icons.Default.Code, contentDescription = null, tint = White)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("View on GitHub", fontWeight = FontWeight.Bold, color = White)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Card(
                 modifier = Modifier.fillMaxWidth().clickable { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://buymeacoffee.com/potatameister"))) },
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFDD00)),
                 shape = RoundedCornerShape(16.dp)
@@ -303,7 +323,7 @@ private fun SupportersModal(onDismiss: () -> Unit) {
             val libs = listOf("Jetpack Compose", "AndroidX", "Coil (Image Loading)", "Kotlin Coroutines", "ExifInterface", "DataStore")
             libs.forEach { lib ->
                 Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(14.dp), tint = SlateGray)
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp), tint = SkyBlue)
                     Spacer(Modifier.width(8.dp))
                     Text(lib, fontSize = 13.sp, color = SlateDark)
                 }
