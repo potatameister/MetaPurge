@@ -229,7 +229,6 @@ private fun ImageCard(
 @Composable
 private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Show main 18 tags
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             metadata.allTags.image.forEach { (k, v) ->
                 FullMetadataRow(k, v)
@@ -322,7 +321,6 @@ private fun SupportersModal(onDismiss: () -> Unit) {
             Text("Project Supporters", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Reordered: Plantbased4Future on top
             val supporters = listOf(
                 "For the Planet!" to "Plantbased4Future",
                 "Kalyan" to "Me-Kalyan"
@@ -350,12 +348,20 @@ private fun SupportersModal(onDismiss: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
             Text("Opensource library used", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
             Spacer(modifier = Modifier.height(12.dp))
-            val libs = listOf("Jetpack Compose", "AndroidX", "Coil (Image Loading)", "Kotlin Coroutines", "ExifInterface", "DataStore")
-            libs.forEach { lib ->
+            val libs = listOf(
+                "Jetpack Compose" to "Apache 2.0",
+                "AndroidX" to "Apache 2.0",
+                "Coil (Image Loading)" to "MIT",
+                "Kotlin Coroutines" to "Apache 2.0",
+                "ExifInterface" to "Apache 2.0",
+                "DataStore" to "Apache 2.0"
+            )
+            libs.forEach { (lib, license) ->
                 Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp), tint = SkyBlue)
                     Spacer(Modifier.width(8.dp))
-                    Text(lib, fontSize = 13.sp, color = SlateDark)
+                    Text(lib, fontSize = 13.sp, color = SlateDark, modifier = Modifier.weight(1f))
+                    Text(license, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SlateGray)
                 }
             }
             Spacer(modifier = Modifier.height(32.dp))
