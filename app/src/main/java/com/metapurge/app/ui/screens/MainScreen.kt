@@ -200,7 +200,7 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
                                         color = DarkNavy.copy(alpha = 0.6f)
                                     )
                                     TextButton(
-                                        onClick = { viewModel.saveSessionToGallery(sessionId ?: "") },
+                                        onClick = { viewModel.saveSessionToGallery(sessionId) },
                                         shape = RoundedCornerShape(12.dp),
                                         colors = ButtonDefaults.textButtonColors(contentColor = DarkNavy)
                                     ) {
@@ -543,7 +543,6 @@ private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata)
             MetadataItem(Icons.Default.Code, "Software", it)
         }
 
-        // Expert Mode
         var expertMode by remember { mutableStateOf(false) }
         val expertRotation by animateFloatAsState(if (expertMode) 180f else 0f, label = "")
 
@@ -562,7 +561,7 @@ private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata)
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Settings, contentDescription = null, size = 14.dp, tint = SlateDark)
+                    Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(14.dp), tint = SlateDark)
                     Spacer(Modifier.width(8.dp))
                     Text("Expert Mode", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SlateDark)
                 }
@@ -742,7 +741,7 @@ private fun HowItWorks() {
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.HelpOutline, contentDescription = null, tint = DarkNavy, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.HelpOutline, contentDescription = null, modifier = Modifier.size(20.dp), tint = DarkNavy)
                     Spacer(Modifier.width(8.dp))
                     Text("What is metadata?", fontWeight = FontWeight.Bold, color = DarkNavy, fontSize = 16.sp)
                 }
@@ -761,7 +760,7 @@ private fun HowItWorks() {
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AutoDelete, contentDescription = null, tint = White, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.AutoDelete, contentDescription = null, modifier = Modifier.size(20.dp), tint = White)
                     Spacer(Modifier.width(8.dp))
                     Text("The 'Nuclear' Approach", fontWeight = FontWeight.Bold, color = White, fontSize = 16.sp)
                 }

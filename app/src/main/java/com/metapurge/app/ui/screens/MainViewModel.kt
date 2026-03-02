@@ -29,17 +29,23 @@ class MainViewModel(
     private val _toast = MutableStateFlow<String?>(null)
     val toast: StateFlow<String?> = _toast
 
-    // FIX #2: One-by-One UI Updates (No more freezing)
     fun processUris(uris: List<Uri>) {
-        val sessionId = UUID.randomUUID().toString()
+        val sessionId = System.currentTimeMillis()
         viewModelScope.launch {
             _isProcessing.value = true
             uris.forEach { uri ->
                 val fileName = getFileName(uri) ?: "image_${System.currentTimeMillis()}.jpg"
+                val size = getFileSize(uri)
                 val metadata = metadataRepository.readMetadata(uri)
-                val newItem = ImageItem(uri = uri.toString(), name = fileName, metadata = metadata, sessionId = sessionId)
+                val newItem = ImageItem(
+                    id = UUID.randomUUID().toString(),
+                    uri = uri.toString(),
+                    name = fileName,
+                    size = size,
+                    metadata = metadata,
+                    sessionId = sessionId
+                )
                 
-                // Add to list immediately
                 val current = _images.value.toMutableList()
                 current.add(0, newItem)
                 _images.value = current
@@ -61,7 +67,6 @@ class MainViewModel(
         }
     }
 
-    // FIX #1: Sequential Purging (OOM Protection)
     fun purgeAll() {
         viewModelScope.launch {
             _isProcessing.value = true
@@ -77,16 +82,16 @@ class MainViewModel(
         }
     }
 
-    fun saveSessionToGallery(sessionId: String) {
+    fun saveSessionToGallery(sessionId: Long) {
         viewModelScope.launch {
             val sessionImages = _images.value.filter { it.sessionId == sessionId && it.isPurged }
             var saved = 0
             sessionImages.forEach { image ->
                 val uri = image.cleanedUri?.let { Uri.parse(it) } ?: return@forEach
                 val mime = when {
-                    image.name.endsWith(".png", true) -> "image/png"
-                    image.name.endsWith(".webp", true) -> "image/webp"
-                    image.name.endsWith(".gif", true) -> "image/gif"
+                    image.name.lowercase().endsWith(".png") -> "image/png"
+                    image.name.lowercase().endsWith(".webp") -> "image/webp"
+                    image.name.lowercase().endsWith(".gif") -> "image/gif"
                     else -> "image/jpeg"
                 }
                 if (metadataRepository.saveToGallery(uri, image.name, mime) != null) saved++
@@ -110,10 +115,26 @@ class MainViewModel(
         var res: String? = null
         if (uri.scheme == "content") {
             context.contentResolver.query(uri, null, null, null, null)?.use {
-                if (it.moveToFirst()) res = it.getString(it.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+                if (it.moveToFirst()) {
+                    val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (index != -1) res = it.getString(index)
+                }
             }
         }
         return res ?: uri.path?.substringAfterLast('/')
+    }
+
+    private fun getFileSize(uri: Uri): Long {
+        var size = 0L
+        if (uri.scheme == "content") {
+            context.contentResolver.query(uri, null, null, null, null)?.use {
+                if (it.moveToFirst()) {
+                    val index = it.getColumnIndex(OpenableColumns.SIZE)
+                    if (index != -1) size = it.getLong(index)
+                }
+            }
+        }
+        return size
     }
 
     class Factory(
