@@ -37,6 +37,8 @@ import com.metapurge.app.R
 import com.metapurge.app.domain.model.ImageItem
 import com.metapurge.app.ui.theme.*
 import kotlinx.coroutines.delay
+import androidx.core.content.FileProvider
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,7 +119,11 @@ private fun SessionGroup(sessionId: Long, sessionImages: List<ImageItem>, viewMo
         if (purgedCount > 0) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(text = "Purged Session", style = MaterialTheme.typography.labelMedium, color = DarkNavy.copy(alpha = 0.6f))
-                TextButton(onClick = { viewModel.saveSessionToGallery(sessionId) }, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.textButtonColors(contentColor = DarkNavy)) {
+                TextButton(
+                    onClick = { viewModel.saveSessionToGallery(sessionId) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.textButtonColors(contentColor = SkyBlue)
+                ) {
                     Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Save $purgedCount to Gallery", style = MaterialTheme.typography.labelSmall)
@@ -135,14 +141,30 @@ private fun SessionGroup(sessionId: Long, sessionImages: List<ImageItem>, viewMo
                         Icon(Icons.Default.Delete, contentDescription = "Delete", tint = White)
                     }
                 },
-                content = { ImageCard(image = image, onPurge = { viewModel.purgeImage(image.id) }, onRemove = { viewModel.removeImage(image.id) }, onShare = { shareImage(context, image) }, formatBytes = viewModel::formatBytes) }
+                content = { 
+                    ImageCard(
+                        image = image, 
+                        onPurge = { viewModel.purgeImage(image.id) }, 
+                        onRemove = { viewModel.removeImage(image.id) }, 
+                        onShare = { shareImage(context, image) },
+                        onSave = { viewModel.saveImageToGallery(image.id) },
+                        formatBytes = viewModel::formatBytes
+                    ) 
+                }
             )
         }
     }
 }
 
 @Composable
-private fun ImageCard(image: ImageItem, onPurge: () -> Unit, onRemove: () -> Unit, onShare: () -> Unit, formatBytes: (Long) -> String) {
+private fun ImageCard(
+    image: ImageItem, 
+    onPurge: () -> Unit, 
+    onRemove: () -> Unit, 
+    onShare: () -> Unit, 
+    onSave: () -> Unit,
+    formatBytes: (Long) -> String
+) {
     val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
     val rotationState by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "rotation")
@@ -176,10 +198,13 @@ private fun ImageCard(image: ImageItem, onPurge: () -> Unit, onRemove: () -> Uni
                         val metaSize = image.metadata?.metadataSize ?: 0L
                         Text(if (metaSize > 0) "${formatBytes(metaSize)} metadata found" else "No metadata detected", fontSize = 12.sp, color = if (metaSize > 0) Color(0xFFE53935) else SlateGray)
                     }
-                    if (!image.isPurged && (image.metadata?.hasExif == true)) {
-                        Button(onClick = onPurge, colors = ButtonDefaults.buttonColors(containerColor = DarkNavy), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)) { Text("Purge", fontSize = 12.sp) }
-                    } else if (image.isPurged) {
-                        IconButton(onClick = onShare) { Icon(Icons.Default.Share, contentDescription = "Share", tint = DarkNavy) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (!image.isPurged && (image.metadata?.hasExif == true)) {
+                            Button(onClick = onPurge, colors = ButtonDefaults.buttonColors(containerColor = DarkNavy), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)) { Text("Purge", fontSize = 12.sp) }
+                        } else if (image.isPurged) {
+                            IconButton(onClick = onSave) { Icon(Icons.Default.SaveAlt, contentDescription = "Save", tint = SkyBlue) }
+                            IconButton(onClick = onShare) { Icon(Icons.Default.Share, contentDescription = "Share", tint = DarkNavy) }
+                        }
                     }
                 }
                 if (image.metadata != null && image.metadata.hasExif) {
@@ -347,6 +372,18 @@ private fun BatchActions(count: Int, isProcessing: Boolean, onPurgeAll: () -> Un
 private fun shareImage(context: android.content.Context, image: ImageItem) {
     val uriString = image.cleanedUri ?: image.uri
     val uri = Uri.parse(uriString)
+    
+    val shareUri = if (uri.scheme == "file") {
+        val file = File(uri.path ?: "")
+        try {
+            FileProvider.getUriForFile(context, "com.metapurge.app.fileprovider", file)
+        } catch (e: Exception) {
+            uri
+        }
+    } else {
+        uri
+    }
+
     val lowerUri = uriString.lowercase()
     val mimeType = when {
         lowerUri.endsWith(".png") -> "image/png"
@@ -354,7 +391,12 @@ private fun shareImage(context: android.content.Context, image: ImageItem) {
         lowerUri.endsWith(".gif") -> "image/gif"
         else -> "image/jpeg"
     }
-    val intent = Intent(Intent.ACTION_SEND).apply { type = mimeType; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+    
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = mimeType
+        putExtra(Intent.EXTRA_STREAM, shareUri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
     context.startActivity(Intent.createChooser(intent, "Share Cleaned Photo"))
 }
 
