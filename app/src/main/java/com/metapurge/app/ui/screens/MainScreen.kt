@@ -42,426 +42,125 @@ import kotlinx.coroutines.delay
 @Composable
 fun MainScreen(initialUris: List<Uri> = emptyList()) {
     val context = LocalContext.current
-    
     val metadataRepository = remember { com.metapurge.app.data.repository.MetadataRepository(context) }
     val statsRepository = remember { com.metapurge.app.data.repository.StatsRepository(context) }
+    val viewModel: MainViewModel = viewModel(factory = MainViewModel.Factory(context, metadataRepository, statsRepository))
     
-    val viewModel: MainViewModel = viewModel(
-        factory = MainViewModel.Factory(context, metadataRepository, statsRepository)
-    )
-    
-    LaunchedEffect(initialUris) {
-        if (initialUris.isNotEmpty()) {
-            viewModel.processUris(initialUris)
-        }
-    }
+    LaunchedEffect(initialUris) { if (initialUris.isNotEmpty()) viewModel.processUris(initialUris) }
 
     val images by viewModel.images.collectAsState()
     val isProcessing by viewModel.isProcessing.collectAsState()
     val toast by viewModel.toast.collectAsState()
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> if (uris.isNotEmpty()) viewModel.processUris(uris) }
 
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            viewModel.processUris(uris)
-        }
-    }
+    var showSupportersModal by remember { mutableStateOf(false) }
 
-    var showInfoModal by remember { mutableStateOf(false) }
+    LaunchedEffect(toast) { toast?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show(); delay(2000); viewModel.dismissToast() } }
 
-    LaunchedEffect(toast) {
-        if (toast != null) {
-            Toast.makeText(context, toast, Toast.LENGTH_SHORT).show()
-            delay(2000)
-            viewModel.dismissToast()
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(White, Color(0xFFF1F5F9), LightGray)
-                )
-            )
-    ) {
+    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(White, Color(0xFFF1F5F9), LightGray)))) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
                     title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            AsyncImage(
-                                model = R.drawable.ic_launcher,
-                                contentDescription = "MetaPurge Icon",
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(RoundedCornerShape(12.dp)),
-                                contentScale = ContentScale.Crop
-                            )
-                            Text(
-                                "MetaPurge",
-                                fontWeight = FontWeight.Bold,
-                                color = White,
-                                fontSize = 22.sp
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            AsyncImage(model = R.drawable.ic_launcher, contentDescription = null, modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
+                            Text("MetaPurge", fontWeight = FontWeight.Bold, color = White, fontSize = 22.sp)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = DarkNavy,
-                        titleContentColor = White
-                    ),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkNavy, titleContentColor = White),
                     actions = {
-                        IconButton(onClick = { showInfoModal = true }) {
-                            Icon(
-                                Icons.Default.Info,
-                                contentDescription = "Info",
-                                tint = SlateGray
-                            )
+                        IconButton(onClick = { showSupportersModal = true }) {
+                            Icon(Icons.Default.VolunteerActivism, contentDescription = "Supporters", tint = SkyBlue)
                         }
                     }
                 )
             }
         ) { paddingValues ->
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                item { Spacer(modifier = Modifier.height(8.dp)) }
+                
                 item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                item {
-                    HowItWorks()
-                }
-                item {
-                    AnimatedContent(
-                        targetState = images.isNotEmpty(),
-                        transitionSpec = {
-                            fadeIn(animationSpec = tween(300)) togetherWith
-                                    fadeOut(animationSpec = tween(300))
-                        },
-                        label = "upload_zone"
-                    ) { hasImages ->
-                        if (hasImages) {
-                            CompactUploadZone(
-                                count = images.size,
-                                onClick = { launcher.launch("image/*") }
-                            )
-                        } else {
-                            UploadZone(onClick = { launcher.launch("image/*") })
-                        }
+                    AnimatedContent(targetState = images.isNotEmpty(), label = "upload_zone") { hasImages ->
+                        if (hasImages) CompactUploadZone(count = images.size, onClick = { launcher.launch("image/*") })
+                        else UploadZone(onClick = { launcher.launch("image/*") })
                     }
                 }
 
                 if (images.isNotEmpty()) {
-                    item {
-                        BatchActions(
-                            count = images.count { !it.isPurged && it.metadata?.hasExif == true },
-                            isProcessing = isProcessing,
-                            onPurgeAll = { viewModel.purgeAll() },
-                            onClear = { viewModel.clearAll() }
-                        )
-                    }
+                    item { BatchActions(count = images.count { !it.isPurged && it.metadata?.hasExif == true }, isProcessing = isProcessing, onPurgeAll = { viewModel.purgeAll() }, onClear = { viewModel.clearAll() }) }
                 }
 
                 val groupedImages = images.groupBy { it.sessionId }
-                
                 groupedImages.forEach { (sessionId, sessionImages) ->
                     item(key = "session_$sessionId") {
-                        SessionGroup(
-                            sessionId = sessionId,
-                            sessionImages = sessionImages,
-                            viewModel = viewModel,
-                            context = context
-                        )
+                        SessionGroup(sessionId = sessionId, sessionImages = sessionImages, viewModel = viewModel, context = context)
                     }
                 }
 
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    SupportSection()
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(80.dp))
-                }
+                item { SupportSection() }
+                item { HowItWorks() }
+                item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
-
-        if (showInfoModal) {
-            InfoModal(onDismiss = { showInfoModal = false })
-        }
+        if (showSupportersModal) SupportersModal(onDismiss = { showSupportersModal = false })
     }
 }
 
 @Composable
-private fun SessionGroup(
-    sessionId: Long,
-    sessionImages: List<ImageItem>,
-    viewModel: MainViewModel,
-    context: android.content.Context
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .border(
-                BorderStroke(1.5.dp, DarkNavy.copy(alpha = 0.2f)),
-                RoundedCornerShape(24.dp)
-            )
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+private fun SessionGroup(sessionId: Long, sessionImages: List<ImageItem>, viewModel: MainViewModel, context: android.content.Context) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         val purgedCount = sessionImages.count { it.isPurged }
         if (purgedCount > 0) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Purged Session",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = DarkNavy.copy(alpha = 0.6f)
-                )
-                TextButton(
-                    onClick = { viewModel.saveSessionToGallery(sessionId) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.textButtonColors(contentColor = DarkNavy)
-                ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "Purged Session", style = MaterialTheme.typography.labelMedium, color = DarkNavy.copy(alpha = 0.6f))
+                TextButton(onClick = { viewModel.saveSessionToGallery(sessionId) }, shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.textButtonColors(contentColor = DarkNavy)) {
                     Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Save $purgedCount to Gallery", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
-
         sessionImages.forEach { image ->
-            val dismissState = rememberSwipeToDismissBoxState(
-                confirmValueChange = {
-                    if (it == SwipeToDismissBoxValue.EndToStart) {
-                        viewModel.removeImage(image.id)
-                        true
-                    } else false
-                }
-            )
-
+            val dismissState = rememberSwipeToDismissBoxState(confirmValueChange = { if (it == SwipeToDismissBoxValue.EndToStart) { viewModel.removeImage(image.id); true } else false })
             SwipeToDismissBox(
                 state = dismissState,
                 enableDismissFromStartToEnd = false,
                 backgroundContent = {
-                    val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-                        Color.Red.copy(alpha = 0.8f)
-                    } else Color.Transparent
-                    
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(color)
-                            .padding(horizontal = 20.dp),
-                        contentAlignment = Alignment.CenterEnd
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            tint = White
-                        )
+                    val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Color.Red.copy(alpha = 0.8f) else Color.Transparent
+                    Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)).background(color).padding(horizontal = 20.dp), contentAlignment = Alignment.CenterEnd) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = White)
                     }
                 },
-                content = {
-                    ImageCard(
-                        image = image,
-                        onPurge = { viewModel.purgeImage(image.id) },
-                        onRemove = { viewModel.removeImage(image.id) },
-                        onShare = { shareImage(context, image) },
-                        formatBytes = viewModel::formatBytes
-                    )
-                }
+                content = { ImageCard(image = image, onPurge = { viewModel.purgeImage(image.id) }, onRemove = { viewModel.removeImage(image.id) }, onShare = { shareImage(context, image) }, formatBytes = viewModel::formatBytes) }
             )
         }
     }
 }
 
 @Composable
-private fun UploadZone(onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = White),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(2.dp, Brush.linearGradient(listOf(SkyBlue, DarkNavyLight)))
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                Icons.Default.AddPhotoAlternate,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = DarkNavy
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "Select Photos to Purge",
-                fontWeight = FontWeight.Bold,
-                color = DarkNavy
-            )
-            Text(
-                "JPEGs, PNGs, WebPs supported",
-                fontSize = 12.sp,
-                color = SlateGray
-            )
-        }
-    }
-}
-
-@Composable
-private fun CompactUploadZone(count: Int, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = White),
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, LightGray)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = DarkNavy)
-                Spacer(modifier = Modifier.width(12.dp))
-                Text("$count Photos Selected", fontWeight = FontWeight.SemiBold, color = DarkNavy)
-            }
-            Icon(Icons.Default.Add, contentDescription = "Add More", tint = SkyBlue)
-        }
-    }
-}
-
-@Composable
-private fun BatchActions(
-    count: Int,
-    isProcessing: Boolean,
-    onPurgeAll: () -> Unit,
-    onClear: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Button(
-            onClick = onPurgeAll,
-            modifier = Modifier.weight(1f),
-            enabled = count > 0 && !isProcessing,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = DarkNavyLight,
-                disabledContainerColor = DarkNavyLight.copy(alpha = 0.5f)
-            ),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            if (isProcessing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    color = White,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Icon(Icons.Default.CleaningServices, contentDescription = null, modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.width(8.dp))
-            Text("Purge All ($count)", color = White, fontWeight = FontWeight.SemiBold)
-        }
-
-        OutlinedButton(
-            onClick = onClear,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = SlateGray),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Text("Clear")
-        }
-    }
-}
-
-@Composable
-private fun ImageCard(
-    image: ImageItem,
-    onPurge: () -> Unit,
-    onRemove: () -> Unit,
-    onShare: () -> Unit,
-    formatBytes: (Long) -> String
-) {
+private fun ImageCard(image: ImageItem, onPurge: () -> Unit, onRemove: () -> Unit, onShare: () -> Unit, formatBytes: (Long) -> String) {
     val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
-    val rotationState by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        label = "rotation"
-    )
+    val rotationState by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "rotation")
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(),
+        modifier = Modifier.fillMaxWidth().animateContentSize().border(BorderStroke(1.5.dp, DarkNavy.copy(alpha = 0.15f)), RoundedCornerShape(24.dp)),
         colors = CardDefaults.cardColors(containerColor = White),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(Uri.parse(image.uri))
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-
-                IconButton(
-                    onClick = onRemove,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(50))
-                        .size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Remove",
-                        tint = White,
-                        modifier = Modifier.size(16.dp)
-                    )
+            Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
+                AsyncImage(model = ImageRequest.Builder(context).data(Uri.parse(image.uri)).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                IconButton(onClick = onRemove, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(50)).size(32.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Remove", tint = White, modifier = Modifier.size(16.dp))
                 }
-
                 if (image.isPurged) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(12.dp)
-                            .background(SkyBlue, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
+                    Box(modifier = Modifier.align(Alignment.BottomStart).padding(12.dp).background(SkyBlue, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Check, contentDescription = null, tint = White, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
@@ -470,72 +169,28 @@ private fun ImageCard(
                     }
                 }
             }
-
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            image.name,
-                            fontWeight = FontWeight.Bold,
-                            color = DarkNavy,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Text(image.name, fontWeight = FontWeight.Bold, color = DarkNavy, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         val metaSize = image.metadata?.metadataSize ?: 0L
-                        Text(
-                            if (metaSize > 0) "${formatBytes(metaSize)} metadata found" else "No metadata detected",
-                            fontSize = 12.sp,
-                            color = if (metaSize > 0) Color(0xFFE53935) else SlateGray
-                        )
+                        Text(if (metaSize > 0) "${formatBytes(metaSize)} metadata found" else "No metadata detected", fontSize = 12.sp, color = if (metaSize > 0) Color(0xFFE53935) else SlateGray)
                     }
-
                     if (!image.isPurged && (image.metadata?.hasExif == true)) {
-                        Button(
-                            onClick = onPurge,
-                            colors = ButtonDefaults.buttonColors(containerColor = DarkNavy),
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
-                        ) {
-                            Text("Purge", fontSize = 12.sp)
-                        }
+                        Button(onClick = onPurge, colors = ButtonDefaults.buttonColors(containerColor = DarkNavy), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)) { Text("Purge", fontSize = 12.sp) }
                     } else if (image.isPurged) {
-                        IconButton(onClick = onShare) {
-                            Icon(Icons.Default.Share, contentDescription = "Share", tint = DarkNavy)
-                        }
+                        IconButton(onClick = onShare) { Icon(Icons.Default.Share, contentDescription = "Share", tint = DarkNavy) }
                     }
                 }
-
                 if (image.metadata != null && image.metadata.hasExif) {
                     Spacer(modifier = Modifier.height(12.dp))
                     HorizontalDivider(color = LightGray.copy(alpha = 0.5f))
                     Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { expanded = !expanded },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Metadata Details", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = SlateGray)
-                        Icon(
-                            Icons.Default.ExpandMore,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .rotate(rotationState),
-                            tint = SlateGray
-                        )
+                        Icon(Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(20.dp).rotate(rotationState), tint = SlateGray)
                     }
-
-                    if (expanded) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        MetadataGrid(image.metadata)
-                    }
+                    if (expanded) { Spacer(modifier = Modifier.height(12.dp)); MetadataGrid(image.metadata) }
                 }
             }
         }
@@ -545,53 +200,30 @@ private fun ImageCard(
 @Composable
 private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        metadata.gps?.let {
-            MetadataItem(Icons.Default.LocationOn, "Location", it.display)
-        }
-        metadata.camera?.let {
-            MetadataItem(Icons.Default.PhotoCamera, "Device", it)
-        }
-        metadata.dateTime?.let {
-            MetadataItem(Icons.Default.Event, "Taken on", it)
-        }
-        metadata.software?.let {
-            MetadataItem(Icons.Default.Code, "Software", it)
-        }
+        metadata.gps?.let { MetadataItem(Icons.Default.LocationOn, "Location", it.display) }
+        metadata.camera?.let { MetadataItem(Icons.Default.PhotoCamera, "Device", it) }
+        metadata.dateTime?.let { MetadataItem(Icons.Default.Event, "Taken on", it) }
+        metadata.software?.let { MetadataItem(Icons.Default.Code, "Software", it) }
 
         var expertMode by remember { mutableStateOf(false) }
         val expertRotation by animateFloatAsState(if (expertMode) 180f else 0f, label = "")
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(LightGray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                .padding(8.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expertMode = !expertMode }
-                    .padding(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+        Column(modifier = Modifier.fillMaxWidth().background(LightGray.copy(alpha = 0.3f), RoundedCornerShape(12.dp)).padding(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().clickable { expertMode = !expertMode }.padding(4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(14.dp), tint = SlateDark)
                     Spacer(Modifier.width(8.dp))
-                    Text("Expert Mode", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SlateDark)
+                    Text("Expert Mode (All Tags)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SlateDark)
                 }
                 Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.rotate(expertRotation), tint = SlateDark)
             }
-
             if (expertMode) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    metadata.allTags.technical.forEach { (k, v) ->
-                        FullMetadataRow(k, v)
-                    }
-                    metadata.allTags.exif.forEach { (k, v) ->
-                        FullMetadataRow(k, v)
-                    }
+                    metadata.allTags.image.forEach { (k, v) -> FullMetadataRow(k, v) }
+                    metadata.allTags.exif.forEach { (k, v) -> FullMetadataRow(k, v) }
+                    metadata.allTags.gps.forEach { (k, v) -> FullMetadataRow(k, v) }
+                    metadata.allTags.technical.forEach { (k, v) -> FullMetadataRow(k, v) }
                 }
             }
         }
@@ -603,101 +235,58 @@ private fun MetadataItem(icon: ImageVector, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = SkyBlue)
         Spacer(modifier = Modifier.width(8.dp))
-        Column {
-            Text(label, fontSize = 10.sp, color = SlateGray)
-            Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = DarkNavy)
-        }
+        Column { Text(label, fontSize = 10.sp, color = SlateGray); Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = DarkNavy) }
     }
 }
 
 @Composable
 private fun FullMetadataRow(key: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            key.replace("_", " "),
-            fontSize = 12.sp,
-            color = SlateDark,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            value,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = DarkNavy,
-            modifier = Modifier.weight(1.5f),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(key.replace("_", " "), fontSize = 11.sp, color = SlateDark, modifier = Modifier.weight(1f))
+        Text(value, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = DarkNavy, modifier = Modifier.weight(1.5f), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InfoModal(onDismiss: () -> Unit) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = White,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp)
-        ) {
-            Text(
-                "About MetaPurge",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = DarkNavy
-            )
-
+private fun SupportersModal(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = White, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+            Text("Support potatameister", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
             Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                "Every photo contains hidden EXIF metadata - including GPS location, device info, and timestamps. MetaPurge removes all of it, keeping only the pixels.",
-                fontSize = 14.sp,
-                color = SlateDark,
-                lineHeight = 20.sp
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(DarkNavy, RoundedCornerShape(12.dp))
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    Icons.Default.Security,
-                    contentDescription = null,
-                    tint = White,
-                    modifier = Modifier.size(24.dp)
-                )
-                Text(
-                    "100% Offline - Your photos never leave your device",
-                    fontWeight = FontWeight.Medium,
-                    color = White
-                )
-            }
-
+            Text("MetaPurge is built with love and provided for free. Your support helps keep the project alive and 100% FLOSS.", fontSize = 14.sp, color = SlateDark, lineHeight = 20.sp)
             Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = DarkNavy),
+            
+            // Buy Me A Coffee (Yellow Card)
+            Card(
+                modifier = Modifier.fillMaxWidth().clickable { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://buymeacoffee.com/potatameister"))) },
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFDD00)),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("Got it!", color = White, fontWeight = FontWeight.SemiBold)
+                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    Icon(Icons.Default.Coffee, contentDescription = null, tint = Color.Black)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Buy me a coffee", fontWeight = FontWeight.Bold, color = Color.Black)
+                }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // GitHub Sponsor (Dark Card)
+            Card(
+                modifier = Modifier.fillMaxWidth().clickable { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/sponsors/potatameister"))) },
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF24292F)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    Icon(Icons.Default.Favorite, contentDescription = null, tint = Color(0xFFEA4AAA))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Sponsor on GitHub", fontWeight = FontWeight.Bold, color = White)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
@@ -705,87 +294,72 @@ private fun InfoModal(onDismiss: () -> Unit) {
 @Composable
 private fun SupportSection() {
     val context = LocalContext.current
-    
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://buymeacoffee.com/potatameister"))
-                context.startActivity(intent)
-            },
+        modifier = Modifier.fillMaxWidth().clickable { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://buymeacoffee.com/potatameister"))) },
         colors = CardDefaults.cardColors(containerColor = SkyBlue.copy(alpha = 0.1f)),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                Icons.Default.Favorite,
-                contentDescription = null,
-                tint = SkyBlue,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                "Support MetaPurge",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = DarkNavy
-            )
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            Icon(Icons.Default.Favorite, contentDescription = null, tint = SkyBlue, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp)); Text("Support MetaPurge", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = DarkNavy)
         }
     }
 }
 
 @Composable
 private fun HowItWorks() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = White),
-            shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(1.dp, LightGray)
-        ) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = White), shape = RoundedCornerShape(24.dp), border = BorderStroke(1.dp, LightGray)) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.HelpOutline, contentDescription = null, modifier = Modifier.size(20.dp), tint = DarkNavy)
-                    Spacer(Modifier.width(8.dp))
-                    Text("What is metadata?", fontWeight = FontWeight.Bold, color = DarkNavy, fontSize = 16.sp)
+                    Spacer(Modifier.width(8.dp)); Text("What is metadata?", fontWeight = FontWeight.Bold, color = DarkNavy, fontSize = 16.sp)
                 }
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    "Photos contain hidden digital 'tags' called EXIF data. This includes your GPS coordinates, the exact time, and your device serial number. Most apps share this without you knowing.",
-                    fontSize = 13.sp, color = SlateDark, lineHeight = 18.sp
-                )
+                Text("Photos contain hidden digital 'tags' called EXIF data. This includes your GPS coordinates, the exact time, and your device serial number. Most apps share this without you knowing.", fontSize = 13.sp, color = SlateDark, lineHeight = 18.sp)
             }
         }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = DarkNavy),
-            shape = RoundedCornerShape(24.dp)
-        ) {
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = DarkNavy), shape = RoundedCornerShape(24.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AutoDelete, contentDescription = null, modifier = Modifier.size(20.dp), tint = White)
-                    Spacer(Modifier.width(8.dp))
-                    Text("The 'Nuclear' Approach", fontWeight = FontWeight.Bold, color = White, fontSize = 16.sp)
+                    Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(20.dp), tint = White)
+                    Spacer(Modifier.width(8.dp)); Text("Privacy-First Cleaning", fontWeight = FontWeight.Bold, color = White, fontSize = 16.sp)
                 }
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    "Unlike other apps that just 'hide' tags, MetaPurge physically cuts the metadata bytes out of the file. It's 100% offline and creates a permanent, metadata-free copy of your photo.",
-                    fontSize = 13.sp, color = White.copy(alpha = 0.8f), lineHeight = 18.sp
-                )
+                Text("MetaPurge uses a surgical approach to privacy. It parses the file's internal structure and physically removes the segments containing metadata while leaving your pixels untouched. All processing happens 100% offline on your device.", fontSize = 13.sp, color = White.copy(alpha = 0.8f), lineHeight = 18.sp)
             }
         }
+    }
+}
+
+private fun CompactUploadZone(count: Int, onClick: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, LightGray)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = DarkNavy); Spacer(modifier = Modifier.width(12.dp)); Text("$count Photos Selected", fontWeight = FontWeight.SemiBold, color = DarkNavy) }
+            Icon(Icons.Default.Add, contentDescription = "Add More", tint = SkyBlue)
+        }
+    }
+}
+
+@Composable
+private fun UploadZone(onClick: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth().height(200.dp).clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = White), shape = RoundedCornerShape(24.dp), border = BorderStroke(2.dp, Brush.linearGradient(listOf(SkyBlue, DarkNavyLight)))) {
+        Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(48.dp), tint = DarkNavy)
+            Spacer(modifier = Modifier.height(12.dp)); Text("Select Photos to Purge", fontWeight = FontWeight.Bold, color = DarkNavy); Text("JPEGs, PNGs, WebPs supported", fontSize = 12.sp, color = SlateGray)
+        }
+    }
+}
+
+@Composable
+private fun BatchActions(count: Int, isProcessing: Boolean, onPurgeAll: () -> Unit, onClear: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Button(onClick = onPurgeAll, modifier = Modifier.weight(1f), enabled = count > 0 && !isProcessing, colors = ButtonDefaults.buttonColors(containerColor = DarkNavyLight, disabledContainerColor = DarkNavyLight.copy(alpha = 0.5f)), shape = RoundedCornerShape(16.dp)) {
+            if (isProcessing) CircularProgressIndicator(modifier = Modifier.size(18.dp), color = White, strokeWidth = 2.dp)
+            else Icon(Icons.Default.CleaningServices, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp)); Text("Purge All ($count)", color = White, fontWeight = FontWeight.SemiBold)
+        }
+        OutlinedButton(onClick = onClear, colors = ButtonDefaults.outlinedButtonColors(contentColor = SlateGray), shape = RoundedCornerShape(16.dp)) { Text("Clear") }
     }
 }
 
@@ -799,12 +373,7 @@ private fun shareImage(context: android.content.Context, image: ImageItem) {
         lowerUri.endsWith(".gif") -> "image/gif"
         else -> "image/jpeg"
     }
-    
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = mimeType
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
+    val intent = Intent(Intent.ACTION_SEND).apply { type = mimeType; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
     context.startActivity(Intent.createChooser(intent, "Share Cleaned Photo"))
 }
 
