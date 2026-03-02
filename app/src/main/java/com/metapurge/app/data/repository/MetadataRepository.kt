@@ -143,7 +143,7 @@ class MetadataRepository(private val context: Context) {
                 if (ts in listOf("IHDR", "PLTE", "IDAT", "IEND", "tRNS", "sRGB", "gAMA", "cHRM")) {
                     val dos = DataOutputStream(out); dos.writeInt(len); dos.write(type)
                     val buf = ByteArray(8192); var rem = len
-                    while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buffer.size)); dos.write(buf, 0, r); rem -= r }
+                    while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buffer.size)); dos.write(buffer, 0, r); rem -= r }
                     dos.writeInt(dis.readInt())
                 } else dis.skipBytes(len + 4)
                 if (ts == "IEND") break
