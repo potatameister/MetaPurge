@@ -318,6 +318,34 @@ private fun SupportersModal(onDismiss: () -> Unit) {
             }
             
             Spacer(modifier = Modifier.height(32.dp))
+            Text("Project Supporters", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            val supporters = listOf(
+                "Kalyan" to "Me-Kalyan",
+                "For the Planet!" to "Plantbased4Future"
+            )
+            
+            supporters.forEach { (nick, user) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                        .background(SkyBlue.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                        .border(1.dp, SkyBlue.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Stars, contentDescription = null, tint = SkyBlue, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(nick, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = DarkNavy)
+                        Text("@$user", fontSize = 11.sp, color = SlateGray)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
             Text("Libraries Used", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
             Spacer(modifier = Modifier.height(12.dp))
             val libs = listOf("Jetpack Compose", "AndroidX", "Coil (Image Loading)", "Kotlin Coroutines", "ExifInterface", "DataStore")
