@@ -58,6 +58,12 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = false
+    }
+
+    androidResources {
+        @Suppress("UnstableApiUsage")
+        noCompress.add(".webp")
     }
 
     packaging {
