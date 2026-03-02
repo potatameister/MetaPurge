@@ -116,6 +116,28 @@ class MainViewModel(
         }
     }
 
+    fun saveAllCleanedToGallery() {
+        viewModelScope.launch {
+            val cleanedImages = _images.value.filter { it.isPurged }
+            if (cleanedImages.isEmpty()) return@launch
+            
+            var saved = 0
+            cleanedImages.forEach { image ->
+                val uri = image.cleanedUri?.let { Uri.parse(it) } ?: return@forEach
+                val mime = when {
+                    image.name.lowercase().endsWith(".png") -> "image/png"
+                    image.name.lowercase().endsWith(".webp") -> "image/webp"
+                    image.name.lowercase().endsWith(".gif") -> "image/gif"
+                    else -> "image/jpeg"
+                }
+                if (metadataRepository.saveToGallery(uri, image.name, mime) != null) saved++
+            }
+            if (saved > 0) {
+                _toast.value = "Saved $saved images to Pictures/MetaPurge"
+            }
+        }
+    }
+
     fun removeImage(id: String) { _images.value = _images.value.filter { it.id != id } }
     fun clearAll() { _images.value = emptyList() }
     fun dismissToast() { _toast.value = null }

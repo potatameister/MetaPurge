@@ -68,8 +68,13 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            AsyncImage(model = R.drawable.ic_metapurge, contentDescription = null, modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
-                            Text("MetaPurge", fontWeight = FontWeight.Bold, color = White, fontSize = 22.sp)
+                            AsyncImage(
+                                model = R.drawable.ic_metapurge, 
+                                contentDescription = null, 
+                                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)), 
+                                contentScale = ContentScale.Crop
+                            )
+                            Text("MetaPurge", fontWeight = FontWeight.Bold, color = White, fontSize = 20.sp)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkNavy, titleContentColor = White),
@@ -95,12 +100,20 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
                 }
 
                 if (images.isNotEmpty()) {
-                    item { BatchActions(count = images.count { !it.isPurged && it.metadata?.hasExif == true }, isProcessing = isProcessing, onPurgeAll = { viewModel.purgeAll() }, onClear = { viewModel.clearAll() }) }
+                    item { 
+                        BatchActions(
+                            images = images,
+                            isProcessing = isProcessing,
+                            onPurgeAll = { viewModel.purgeAll() },
+                            onSaveAll = { viewModel.saveAllCleanedToGallery() },
+                            onClear = { viewModel.clearAll() }
+                        ) 
+                    }
                 }
 
                 groupedImages.forEach { (sessionId, sessionImages) ->
                     item(key = "session_$sessionId") {
-                        SessionGroup(sessionId = sessionId, sessionImages = sessionImages, viewModel = viewModel, context = context)
+                        SessionGroup(sessionImages = sessionImages, viewModel = viewModel, context = context)
                     }
                 }
 
@@ -113,23 +126,8 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
 }
 
 @Composable
-private fun SessionGroup(sessionId: Long, sessionImages: List<ImageItem>, viewModel: MainViewModel, context: android.content.Context) {
+private fun SessionGroup(sessionImages: List<ImageItem>, viewModel: MainViewModel, context: android.content.Context) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        val purgedCount = sessionImages.count { it.isPurged }
-        if (purgedCount > 0) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "Purged Session", style = MaterialTheme.typography.labelMedium, color = DarkNavy.copy(alpha = 0.6f))
-                TextButton(
-                    onClick = { viewModel.saveSessionToGallery(sessionId) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.textButtonColors(contentColor = SkyBlue)
-                ) {
-                    Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Save $purgedCount to Gallery", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        }
         sessionImages.forEach { image ->
             val dismissState = rememberSwipeToDismissBoxState(confirmValueChange = { if (it == SwipeToDismissBoxValue.EndToStart) { viewModel.removeImage(image.id); true } else false })
             SwipeToDismissBox(
@@ -225,7 +223,6 @@ private fun ImageCard(
 @Composable
 private fun MetadataGrid(metadata: com.metapurge.app.domain.model.ImageMetadata) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Show main 18 tags
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             metadata.allTags.image.forEach { (k, v) ->
                 FullMetadataRow(k, v)
@@ -268,7 +265,7 @@ private fun FullMetadataRow(key: String, value: String) {
 private fun SupportersModal(onDismiss: () -> Unit) {
     val context = LocalContext.current
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = White, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(24.dp).verticalScroll(rememberScrollState())) {
             Text("Support potatameister", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
             Spacer(modifier = Modifier.height(16.dp))
             Text("MetaPurge is built with love and provided for free. Your support helps keep the project alive and 100% FLOSS.", fontSize = 14.sp, color = SlateDark, lineHeight = 20.sp)
@@ -300,6 +297,17 @@ private fun SupportersModal(onDismiss: () -> Unit) {
                 }
             }
             
+            Spacer(modifier = Modifier.height(32.dp))
+            Text("Libraries Used", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = DarkNavy)
+            Spacer(modifier = Modifier.height(12.dp))
+            val libs = listOf("Jetpack Compose", "AndroidX", "Coil (Image Loading)", "Kotlin Coroutines", "ExifInterface", "DataStore")
+            libs.forEach { lib ->
+                Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(14.dp), tint = SlateGray)
+                    Spacer(Modifier.width(8.dp))
+                    Text(lib, fontSize = 13.sp, color = SlateDark)
+                }
+            }
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
@@ -358,14 +366,61 @@ private fun UploadZone(onClick: () -> Unit) {
 }
 
 @Composable
-private fun BatchActions(count: Int, isProcessing: Boolean, onPurgeAll: () -> Unit, onClear: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Button(onClick = onPurgeAll, modifier = Modifier.weight(1f), enabled = count > 0 && !isProcessing, colors = ButtonDefaults.buttonColors(containerColor = DarkNavyLight, disabledContainerColor = DarkNavyLight.copy(alpha = 0.5f)), shape = RoundedCornerShape(16.dp)) {
-            if (isProcessing) CircularProgressIndicator(modifier = Modifier.size(18.dp), color = White, strokeWidth = 2.dp)
-            else Icon(Icons.Default.CleaningServices, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp)); Text("Purge All ($count)", color = White, fontWeight = FontWeight.SemiBold)
+private fun BatchActions(
+    images: List<ImageItem>,
+    isProcessing: Boolean,
+    onPurgeAll: () -> Unit,
+    onSaveAll: () -> Unit,
+    onClear: () -> Unit
+) {
+    val unpurgedWithExif = images.count { !it.isPurged && it.metadata?.hasExif == true }
+    val purgedCount = images.count { it.isPurged }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Button(
+                onClick = onPurgeAll,
+                modifier = Modifier.weight(1f),
+                enabled = unpurgedWithExif > 0 && !isProcessing,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = DarkNavyLight,
+                    disabledContainerColor = DarkNavyLight.copy(alpha = 0.5f)
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                if (isProcessing) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = White, strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.CleaningServices, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+                Text("Purge All ($unpurgedWithExif)", color = White, fontWeight = FontWeight.SemiBold)
+            }
+
+            OutlinedButton(
+                onClick = onClear,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = SlateGray),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("Clear")
+            }
         }
-        OutlinedButton(onClick = onClear, colors = ButtonDefaults.outlinedButtonColors(contentColor = SlateGray), shape = RoundedCornerShape(16.dp)) { Text("Clear") }
+
+        if (purgedCount > 0) {
+            Button(
+                onClick = onSaveAll,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = SkyBlue),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Save $purgedCount Cleaned to Gallery", color = White, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 
