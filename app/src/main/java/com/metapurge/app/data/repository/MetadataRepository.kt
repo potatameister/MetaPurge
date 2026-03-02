@@ -127,7 +127,7 @@ class MetadataRepository(private val context: Context) {
                 val l = dis.readUnsignedShort()
                 if (marker !in 0xE0..0xEF && marker != 0xFE) {
                     out.write(0xFF); out.write(marker); out.write((l shr 8) and 0xFF); out.write(l and 0xFF)
-                    val buf = ByteArray(l - 2); dis.readFully(buf); out.write(buf)
+                    val buffer = ByteArray(l - 2); dis.readFully(buffer); out.write(buffer)
                 } else dis.skipBytes(l - 2)
             }
         } catch (e: Exception) {}
@@ -142,8 +142,8 @@ class MetadataRepository(private val context: Context) {
                 val ts = String(type)
                 if (ts in listOf("IHDR", "PLTE", "IDAT", "IEND", "tRNS", "sRGB", "gAMA", "cHRM")) {
                     val dos = DataOutputStream(out); dos.writeInt(len); dos.write(type)
-                    val buf = ByteArray(8192); var rem = len
-                    while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buffer.size)); dos.write(buf, 0, r); rem -= r }
+                    val buffer = ByteArray(8192); var rem = len
+                    while (rem > 0) { val r = dis.read(buffer, 0, minOf(rem, buffer.size)); dos.write(buffer, 0, r); rem -= r }
                     dos.writeInt(dis.readInt())
                 } else dis.skipBytes(len + 4)
                 if (ts == "IEND") break
@@ -164,7 +164,7 @@ class MetadataRepository(private val context: Context) {
                         if (ts !in listOf("EXIF", "XMP ", "ICCP")) {
                             bodyOut.write(type); DataOutputStream(bodyOut).writeInt(lenLE)
                             val buf = ByteArray(8192); var rem = len
-                            while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buf.size)); bodyOut.write(buf, 0, r); rem -= r }
+                            while (rem > 0) { val r = dis.read(buf, 0, minOf(rem, buffer.size)); bodyOut.write(buf, 0, r); rem -= r }
                             bodySize += 8 + len
                             if (len % 2 != 0) { bodyOut.write(0); dis.skipBytes(1); bodySize += 1 }
                         } else dis.skipBytes(len + (len % 2))
@@ -262,14 +262,12 @@ class MetadataRepository(private val context: Context) {
             ExifInterface.TAG_Y_CB_CR_SUB_SAMPLING, ExifInterface.TAG_Y_CB_CR_POSITIONING,
             ExifInterface.TAG_X_RESOLUTION, ExifInterface.TAG_Y_RESOLUTION, ExifInterface.TAG_RESOLUTION_UNIT,
             ExifInterface.TAG_STRIP_OFFSETS, ExifInterface.TAG_ROWS_PER_STRIP, ExifInterface.TAG_STRIP_BYTE_COUNTS,
-            ExifInterface.TAG_JPEG_INTERCHANGE_FORMAT, ExifInterface.TAG_JPEG_INTERCHANGE_FORMAT_LENGTH,
-            ExifInterface.TAG_TRANSFER_FUNCTION, ExifInterface.TAG_WHITE_POINT, ExifInterface.TAG_PRIMARY_CHROMATICITIES,
-            ExifInterface.TAG_Y_CB_CR_COEFFICIENTS, ExifInterface.TAG_REFERENCE_BLACK_WHITE,
+            ExifInterface.TAG_STRIP_OFFSETS, ExifInterface.TAG_ROWS_PER_STRIP, ExifInterface.TAG_STRIP_BYTE_COUNTS,
             ExifInterface.TAG_EXIF_VERSION, ExifInterface.TAG_FLASHPIX_VERSION, ExifInterface.TAG_COLOR_SPACE,
             ExifInterface.TAG_COMPONENTS_CONFIGURATION, ExifInterface.TAG_COMPRESSED_BITS_PER_PIXEL,
             ExifInterface.TAG_PIXEL_X_DIMENSION, ExifInterface.TAG_PIXEL_Y_DIMENSION, ExifInterface.TAG_MAKER_NOTE,
-            ExifInterface.TAG_RELATED_SOUND_FILE, ExifInterface.TAG_DATETIME_ORIGINAL, ExifInterface.TAG_DATETIME_DIGITIZED,
-            ExifInterface.TAG_SUBSEC_TIME, ExifInterface.TAG_SUBSEC_TIME_ORIGINAL, ExifInterface.TAG_SUBSEC_TIME_DIGITIZED,
+            ExifInterface.TAG_RELATED_SOUND_FILE, ExifInterface.TAG_DATE_TIME_ORIGINAL, ExifInterface.TAG_DATE_TIME_DIGITIZED,
+            ExifInterface.TAG_SUB_SEC_TIME, ExifInterface.TAG_SUB_SEC_TIME_ORIGINAL, ExifInterface.TAG_SUB_SEC_TIME_DIGITIZED,
             ExifInterface.TAG_EXPOSURE_PROGRAM, ExifInterface.TAG_SPECTRAL_SENSITIVITY, ExifInterface.TAG_OECF,
             ExifInterface.TAG_SHUTTER_SPEED_VALUE, ExifInterface.TAG_APERTURE_VALUE, ExifInterface.TAG_BRIGHTNESS_VALUE,
             ExifInterface.TAG_EXPOSURE_BIAS_VALUE, ExifInterface.TAG_MAX_APERTURE_VALUE, ExifInterface.TAG_SUBJECT_DISTANCE,
@@ -293,7 +291,7 @@ class MetadataRepository(private val context: Context) {
             ExifInterface.TAG_GPS_DEST_BEARING_REF, ExifInterface.TAG_GPS_DEST_BEARING,
             ExifInterface.TAG_GPS_DEST_DISTANCE_REF, ExifInterface.TAG_GPS_DEST_DISTANCE,
             ExifInterface.TAG_GPS_PROCESSING_METHOD, ExifInterface.TAG_GPS_AREA_INFORMATION,
-            ExifInterface.TAG_GPS_DATESTAMP, ExifInterface.TAG_GPS_DIFFERENTIAL
+            ExifInterface.TAG_GPS_DATE_STAMP, ExifInterface.TAG_GPS_DIFFERENTIAL
         )
 
         eighteenTags.forEach { tag ->
