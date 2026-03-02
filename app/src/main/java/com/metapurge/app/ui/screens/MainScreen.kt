@@ -37,7 +37,6 @@ import com.metapurge.app.R
 import com.metapurge.app.domain.model.ImageItem
 import com.metapurge.app.ui.theme.*
 import kotlinx.coroutines.delay
-import androidx.core.content.FileProvider
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,7 +112,7 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
 
                 groupedImages.forEach { (sessionId, sessionImages) ->
                     item(key = "session_$sessionId") {
-                        SessionGroup(sessionImages = sessionImages, viewModel = viewModel, context = context)
+                        SessionGroup(sessionImages = sessionImages, viewModel = viewModel)
                     }
                 }
 
@@ -126,7 +125,7 @@ fun MainScreen(initialUris: List<Uri> = emptyList()) {
 }
 
 @Composable
-private fun SessionGroup(sessionImages: List<ImageItem>, viewModel: MainViewModel, context: android.content.Context) {
+private fun SessionGroup(sessionImages: List<ImageItem>, viewModel: MainViewModel) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         val purgedCount = sessionImages.count { it.isPurged }
         if (purgedCount > 0) {
@@ -135,12 +134,10 @@ private fun SessionGroup(sessionImages: List<ImageItem>, viewModel: MainViewMode
             }
         }
         sessionImages.forEach { image ->
-            // FIX: Removed SwipeToDismissBox per user request for simpler UI
             ImageCard(
                 image = image, 
                 onPurge = { viewModel.purgeImage(image.id) }, 
                 onRemove = { viewModel.removeImage(image.id) }, 
-                onShare = { shareImage(context, image) },
                 onSave = { viewModel.saveImageToGallery(image.id) },
                 formatBytes = viewModel::formatBytes
             ) 
@@ -153,7 +150,6 @@ private fun ImageCard(
     image: ImageItem, 
     onPurge: () -> Unit, 
     onRemove: () -> Unit, 
-    onShare: () -> Unit, 
     onSave: () -> Unit,
     formatBytes: (Long) -> String
 ) {
@@ -195,7 +191,6 @@ private fun ImageCard(
                             Button(onClick = onPurge, colors = ButtonDefaults.buttonColors(containerColor = DarkNavy), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)) { Text("Purge", fontSize = 12.sp) }
                         } else if (image.isPurged) {
                             IconButton(onClick = onSave) { Icon(Icons.Default.SaveAlt, contentDescription = "Save", tint = SkyBlue) }
-                            IconButton(onClick = onShare) { Icon(Icons.Default.Share, contentDescription = "Share", tint = DarkNavy) }
                         }
                     }
                 }
@@ -467,38 +462,6 @@ private fun BatchActions(
             }
         }
     }
-}
-
-private fun shareImage(context: android.content.Context, image: ImageItem) {
-    val uriString = image.cleanedUri ?: image.uri
-    val uri = Uri.parse(uriString)
-    
-    val shareUri = if (uri.scheme == "file") {
-        val file = File(uri.path ?: "")
-        try {
-            FileProvider.getUriForFile(context, "com.metapurge.app.fileprovider", file)
-        } catch (e: Exception) {
-            uri
-        }
-    } else {
-        uri
-    }
-
-    val lowerUri = uriString.lowercase()
-    val mimeType = when {
-        lowerUri.endsWith(".png") -> "image/png"
-        lowerUri.endsWith(".webp") -> "image/webp"
-        else -> "image/jpeg"
-    }
-    
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = mimeType
-        putExtra(Intent.EXTRA_STREAM, shareUri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    val chooser = Intent.createChooser(intent, "Share Cleaned Photo")
-    chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    context.startActivity(chooser)
 }
 
 private fun Modifier.size(size: Int): Modifier = this.size(size.dp)
