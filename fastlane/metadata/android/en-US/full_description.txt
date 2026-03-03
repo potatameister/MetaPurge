@@ -3,6 +3,7 @@ MetaPurge is a privacy-first utility for locally stripping sensitive EXIF and me
 Unlike other apps that just 'hide' tags, MetaPurge uses a 'nuclear' approach—it physically cuts the metadata segments out of the file bytes.
 
 Key Features:
+
 • 100% Offline: Your photos never leave your device.
 • Zero Permissions: No storage or internet permissions required on modern Android.
 • Format Support: JPEG, PNG, and WebP.
